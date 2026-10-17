@@ -264,6 +264,8 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.25)}
 .thinking{display:flex;align-items:center;gap:10px;color:var(--fg-2)}
 .thinking::before{content:"";width:14px;height:14px;border-radius:50%;border:2px solid var(--accent);border-top-color:transparent;animation:spin .8s linear infinite;flex:none}
 @keyframes spin{to{transform:rotate(360deg)}}
+.lnk{color:var(--accent);font-weight:600;text-decoration:underline;text-underline-offset:2px;font-size:inherit}
+.ai-key-row{display:flex;justify-content:flex-end;font-size:13px}
 .ai-off{font-size:13px;color:var(--fg-2);background:var(--surface);border-radius:var(--r-s);padding:12px 14px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
@@ -1028,6 +1030,81 @@ let tab = 'ch';
 let sample = null;
 try { window.claude?.use?.('sample').then(s => { sample = s; refreshAI(); }).catch(() => {}); } catch {}
 
+/* ---------- Claude в приложении: свой ключ API, хранится только на этом устройстве ---------- */
+const KEY_STORE = 'ap-claude-key';
+const SDK_URL = 'https://cdn.jsdelivr.net/npm/@anthropic-ai/sdk@0.131.0/+esm';
+const VIZ_SCHEMA = { type: 'object', properties: { caption: { type: 'string' }, svg: { type: 'string' } }, required: ['caption', 'svg'], additionalProperties: false };
+const getKey = () => { try { return localStorage.getItem(KEY_STORE) || ''; } catch { return ''; } };
+let apiClientP = null;
+function apiClient() {
+  if (!apiClientP) apiClientP = import(SDK_URL)
+    .then(m => new m.default({ apiKey: getKey(), dangerouslyAllowBrowser: true }))
+    .catch(e => { apiClientP = null; throw { code: 'offline' }; });
+  return apiClientP;
+}
+function apiSample() {
+  const run = async (input, { signal, onText, json } = {}) => {
+    const client = await apiClient();
+    try {
+      const stream = client.beta.messages.stream({
+        model: 'claude-opus-5-5',
+        max_tokens: json ? 32000 : 8000,
+        betas: ['server-side-fallback-2026-07-01'],
+        fallbacks: 'default',
+        output_config: json ? { effort: 'medium', format: { type: 'json_schema', schema: VIZ_SCHEMA } } : { effort: 'low' },
+        messages: [{ role: 'user', content: input }],
+      }, { signal });
+      let text = '';
+      if (onText) stream.on('text', d => { text += d; onText({ text }); });
+      const msg = await stream.finalMessage();
+      if (msg.stop_reason === 'refusal') throw { code: 'refused' };
+      if (msg.stop_reason === 'max_tokens' && json) throw { code: 'bad_svg' };
+      return msg.content.filter(b => b.type === 'text').map(b => b.text).join('');
+    } catch (e) {
+      if (e?.code) throw e;
+      if (signal?.aborted || e?.name === 'APIUserAbortError') throw { code: 'cancelled' };
+      if (e?.status === 401 || e?.status === 403) throw { code: 'bad_key' };
+      if (e?.status === 429) throw { code: 'rate_limited' };
+      if (e?.status === 400 && /credit|balance|billing/i.test(e?.message || '')) throw { code: 'no_credit' };
+      if (!e?.status) throw { code: 'offline' };
+      throw e;
+    }
+  };
+  const s = async (input, opts = {}) => ({ text: await run(input, opts) });
+  s.json = async (input, opts = {}) => {
+    const t = await run(input, { ...opts, json: true });
+    try { return JSON.parse(t); } catch { throw { code: 'invalid_json' }; }
+  };
+  s.viaKey = true;
+  return s;
+}
+if (!window.claude && getKey()) sample = apiSample();
+function keySheet() {
+  const has = !!getKey();
+  openSheet(`<h3>Claude в Аудиополке</h3>
+    <p>Чтобы «Визуализируй это», «Объясни» и вопросы отвечали прямо здесь, вставьте ключ API Anthropic. Ключ хранится только на этом устройстве, запросы идут напрямую в Anthropic. Оплата по факту использования с вашего аккаунта.</p>
+    <p>Ключ создаётся на <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a> в разделе API Keys.</p>
+    <div class="field"><label for="k-in">Ключ API</label><input id="k-in" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="sk-ant-…" value="${has ? '••••••••' : ''}"></div>
+    <div class="acts">${has ? '<button class="btn ghost" data-a="del">Отключить</button>' : '<button class="btn ghost" data-a="no">Отмена</button>'}<button class="btn primary" data-a="ok">Сохранить</button></div>`, el => {
+    const inp = el.querySelector('#k-in');
+    inp.onfocus = () => { if (inp.value === '••••••••') inp.value = ''; };
+    el.querySelector('[data-a=no]')?.addEventListener('click', () => closeSheet());
+    el.querySelector('[data-a=del]')?.addEventListener('click', () => {
+      try { localStorage.removeItem(KEY_STORE); } catch {}
+      apiClientP = null; if (sample?.viaKey) sample = null;
+      closeSheet(); refreshAI(); toast('Claude отключён');
+    });
+    el.querySelector('[data-a=ok]').onclick = () => {
+      const v = inp.value.trim();
+      if (v === '••••••••' || (!v && has)) { closeSheet(); return; }
+      if (!/^sk-ant-/.test(v)) { toast('Ключ должен начинаться с sk-ant-'); return; }
+      try { localStorage.setItem(KEY_STORE, v); } catch { toast('Не получилось сохранить ключ на устройстве'); return; }
+      apiClientP = null; sample = apiSample();
+      closeSheet(); refreshAI(); toast('Claude подключён');
+    };
+  });
+}
+
 function markClick() {
   const b = viewing;
   if (!b || cur?.id !== b.id || !audio.src) { toast('Сначала включите эту книгу'); return; }
@@ -1190,6 +1267,9 @@ const PROMPTS = {
 function aiError(code) {
   return ({
     not_granted: 'Claude не разрешён для этой страницы. Разрешение можно дать в меню артефакта',
+    bad_key: 'Ключ API не подошёл. Проверьте его: «Спросить Claude» → «Ключ API»',
+    no_credit: 'На аккаунте Anthropic закончились средства. Пополните баланс в консоли',
+    offline: 'Нет связи с Claude. Проверьте интернет',
     sampling_disabled: 'Claude недоступен для этого аккаунта',
     rate_limited: 'Слишком много запросов. Попробуйте чуть позже',
     session_expired: 'Нужно заново войти в Claude',
@@ -1226,8 +1306,9 @@ function renderAI(b, f) {
   let h = '<div class="ai-h">Спросить Claude</div>';
   if (!sample) h += `<div class="ai-btns"><a class="btn primary sm" href="${claudeLink(b, f, 'viz')}" target="_blank" rel="noopener">Визуализируй это</a><a class="btn ghost sm" href="${claudeLink(b, f, 'explain')}" target="_blank" rel="noopener">Объясни</a></div>
     <form class="ask" id="ask"><input id="ask-in" placeholder="Свой вопрос про этот момент" autocomplete="off" aria-label="Свой вопрос"><button class="btn ghost sm">Спросить</button></form>
-    <div class="ai-off">Откроется Claude с готовым запросом про этот момент.</div>`;
-  else h += `<div class="ai-btns"><button class="btn primary sm" data-k="viz" ${dis}>Визуализируй это</button><button class="btn ghost sm" data-k="explain" ${dis}>Объясни</button></div>
+    <div class="ai-off">Сейчас откроется Claude с готовым запросом. Чтобы ответы появлялись прямо здесь, <button class="lnk" id="ai-key">подключите Claude по ключу API</button>.</div>`;
+  else if (sample.viaKey) h += '<div class="ai-key-row"><button class="lnk" id="ai-key">Ключ API</button></div>';
+  if (sample) h += `<div class="ai-btns"><button class="btn primary sm" data-k="viz" ${dis}>Визуализируй это</button><button class="btn ghost sm" data-k="explain" ${dis}>Объясни</button></div>
     <form class="ask" id="ask"><input id="ask-in" placeholder="Свой вопрос про этот момент" autocomplete="off" aria-label="Свой вопрос"><button class="btn ghost sm" ${dis}>Спросить</button></form>
     ${f.text ? '' : '<div class="ai-off">Расшифровки аудио нет: Claude видит книгу, главу, время и заметку. Если вставить текст фрагмента через «Изменить», ответ будет точнее.</div>'}`;
   if (busy) h += `<div class="ans"><div class="q">${esc(busy.label)}</div><div class="tx" id="ai-live"><div class="thinking">${busy.kind === 'viz' ? 'Claude рисует, это займёт до минуты…' : 'Claude думает…'}</div></div><div class="foot"><span></span><button id="ai-stop">Остановить</button></div></div>`;
@@ -1245,6 +1326,7 @@ function renderAI(b, f) {
     if (sample) runAI(b, f, 'qa', q);
     else openLink(claudeLink(b, f, 'qa', q));
   };
+  el.querySelector('#ai-key')?.addEventListener('click', keySheet);
   const stop = el.querySelector('#ai-stop');
   if (stop) stop.onclick = () => aiCtl?.abort();
 }
