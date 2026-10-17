@@ -245,6 +245,20 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.25)}
 .stepper button{height:44px;padding:0 12px;border-radius:var(--r-s);background:var(--surface);font-weight:600;font-size:13px;white-space:nowrap}
 .stepper button:hover{background:var(--surface-2)}
 .fd-meta{font-size:13px;color:var(--accent);font-weight:600;margin-bottom:4px}
+.tr{margin-top:12px}
+.tr-box{display:grid;gap:10px;background:var(--surface);border-radius:var(--r-m);padding:14px}
+.tr-box .btn{justify-self:start}
+.tr-hint{font-size:13px;color:var(--fg-2)}
+.tr-head{display:flex;justify-content:space-between;font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--fg-2);margin-bottom:6px}
+.tr-saved{color:var(--accent);text-transform:none;letter-spacing:0}
+.tr-text{width:100%;min-height:120px;resize:none;border:1px solid var(--line);border-radius:var(--r-m);background:var(--surface);color:var(--fg);padding:12px 14px;font:inherit;font-size:15px;line-height:1.5}
+.tr-text:focus{outline:2px solid var(--accent);outline-offset:0}
+.tr-prog.indet i{width:30%!important;animation:indet 1.2s ease-in-out infinite}
+@keyframes indet{0%{transform:translateX(-100%)}100%{transform:translateX(340%)}}
+.selbar{display:grid;gap:8px;margin:10px 0;padding:12px;border-radius:var(--r-m);background:var(--accent-soft)}
+.selbar .btn{justify-self:start}
+.sel-q{font-size:13px;color:var(--fg-2);font-style:italic}
+.tr + .row-acts{margin-top:12px}
 .quote{margin:12px 0 0;padding:12px 14px;border-left:3px solid var(--accent);background:var(--surface);border-radius:0 var(--r-s) var(--r-s) 0;font-size:14px;white-space:pre-wrap;max-height:220px;overflow-y:auto}
 .row-acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
 .btn.sm{height:36px;padding:0 14px;font-size:13px}
@@ -1152,7 +1166,8 @@ function fragmentEditSheet(b, f, isNew) {
       b.fragments = b.fragments || [];
       if (isNew) b.fragments.push(f);
       await putBook(b);
-      if (isNew) { closeSheet(); toast('Фрагмент сохранён'); } else fragmentSheet(b, f);
+      fragmentSheet(b, f);
+      if (isNew && !f.text) transcribe(b, f, { auto: true });
       tab = 'fr'; renderTabs();
     };
   });
@@ -1208,6 +1223,7 @@ async function quickMoment() {
   await putBook(b);
   tab = 'fr'; renderTabs();
   fragmentSheet(b, f);
+  if (asrReady()) { transcribe(b, f).then(() => { if (sample) runAI(b, f, 'viz'); }); return; }
   if (sample) runAI(b, f, 'viz');
   else openLink(claudeLink(b, f, 'viz'));
 }
@@ -1225,7 +1241,7 @@ function fragmentSheet(b, f) {
   openSheet(`<div class="fd-meta num">Глава ${f.ch + 1} из ${b.chapters.length} · ${fmt(f.start)}–${fmt(f.end)} · ${Math.round(f.end - f.start)} сек</div>
     <h3>${esc(fragTitle(b, f))}</h3>
     ${f.note ? `<p>${esc(ch?.name || '')}</p>` : ''}
-    ${f.text ? `<div class="quote">${esc(f.text)}</div>` : ''}
+    <div class="tr" id="tr"></div>
     <div class="row-acts">
       <button class="btn primary sm" data-a="play">Прослушать</button>
       <button class="btn ghost sm" data-a="edit">Изменить</button>
@@ -1241,8 +1257,212 @@ function fragmentSheet(b, f) {
       b.fragments = b.fragments.filter(x => x.id !== f.id);
       await putBook(b); closeSheet(); renderTabs(); toast('Фрагмент удалён');
     };
+    trView = f; trSel = '';
+    renderTranscript(b, f);
     renderAI(b, f);
   }, true);
+}
+
+/* ---------- расшифровка на устройстве: Whisper в фоновом потоке ---------- */
+const ASR_MODELS = {
+  base: { id: 'onnx-community/whisper-base', size: '≈80 МБ', label: 'быстрая' },
+  small: { id: 'onnx-community/whisper-small', size: '≈250 МБ', label: 'точная' },
+};
+const ASR_MAX_SEC = 300;
+const lsGet = k => { try { return localStorage.getItem(k) || ''; } catch { return ''; } };
+const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
+const asrModelKey = () => ASR_MODELS[lsGet('ap-asr-model')] ? lsGet('ap-asr-model') : 'base';
+const asrReady = () => lsGet('ap-asr-ready') === asrModelKey();
+const ASR_WORKER = `
+import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.0/+esm';
+env.allowLocalModels = false;
+let pipe = null, pipeId = null;
+self.onmessage = async (e) => {
+  const { id, model, audio } = e.data;
+  try {
+    if (!pipe || pipeId !== model) {
+      pipe = null;
+      pipe = await pipeline('automatic-speech-recognition', model, {
+        dtype: 'q8', device: 'wasm',
+        progress_callback: p => { if (p.status === 'progress' && p.total) self.postMessage({ id, type: 'download', file: p.file, loaded: p.loaded, total: p.total }); },
+      });
+      pipeId = model;
+    }
+    self.postMessage({ id, type: 'running' });
+    const out = await pipe(audio, { language: 'russian', task: 'transcribe', chunk_length_s: 30, stride_length_s: 5 });
+    self.postMessage({ id, type: 'done', text: String(out && out.text || '').trim() });
+  } catch (err) {
+    self.postMessage({ id, type: 'error', message: String(err && err.message || err) });
+  }
+};`;
+let asrWorker = null, asrSeq = 0;
+const asrJobs = new Map();          // job id -> handlers
+const asrState = new Map();         // fragment id -> { stage, pct }
+function asrGetWorker() {
+  if (asrWorker) return asrWorker;
+  asrWorker = new Worker(URL.createObjectURL(new Blob([ASR_WORKER], { type: 'text/javascript' })), { type: 'module' });
+  asrWorker.onmessage = e => asrJobs.get(e.data.id)?.(e.data);
+  asrWorker.onerror = e => { for (const h of asrJobs.values()) h({ type: 'error', message: e.message || 'worker' }); asrWorker = null; };
+  return asrWorker;
+}
+// MP3: режем только нужный кусок по границам кадров, чтобы не декодировать всю главу
+async function mp3AudioStart(blob) {
+  const h = new Uint8Array(await blob.slice(0, 10).arrayBuffer());
+  if (h[0] === 0x49 && h[1] === 0x44 && h[2] === 0x33) return 10 + ((h[6]<<21)|(h[7]<<14)|(h[8]<<7)|h[9]) + ((h[5] & 0x10) ? 10 : 0);
+  return 0;
+}
+function mp3FrameLen(b, i) {
+  if (b[i] !== 0xFF || (b[i+1] & 0xE0) !== 0xE0 || ((b[i+1]>>1)&3) !== 1) return 0;
+  const ver = (b[i+1]>>3)&3, brIdx = b[i+2]>>4, srIdx = (b[i+2]>>2)&3, pad = (b[i+2]>>1)&1;
+  const SR = {3:[44100,48000,32000], 2:[22050,24000,16000], 0:[11025,12000,8000]}[ver];
+  const BR = ver===3 ? [0,32,40,48,56,64,80,96,112,128,160,192,224,256,320] : [0,8,16,24,32,40,48,56,64,80,96,112,128,144,160];
+  const sr = SR?.[srIdx], br = BR[brIdx];
+  if (!sr || !br) return 0;
+  return Math.floor((ver===3 ? 144000 : 72000) * br / sr) + pad;
+}
+async function mp3Slice(blob, start, end, duration) {
+  const a0 = await mp3AudioStart(blob);
+  const bps = (blob.size - a0) / duration;
+  let b0 = Math.max(a0, Math.floor(a0 + start * bps)), b1 = Math.min(blob.size, Math.ceil(a0 + end * bps));
+  const win = new Uint8Array(await blob.slice(b0, Math.min(blob.size, b0 + 8192)).arrayBuffer());
+  for (let i = 0; i + 4 < win.length; i++) {
+    const L = mp3FrameLen(win, i);
+    if (L && (i + L + 4 > win.length || mp3FrameLen(win, i + L))) { b0 += i; break; }
+  }
+  return blob.slice(b0, b1, 'audio/mpeg');
+}
+function toMono16k(buf) {
+  const n = buf.numberOfChannels, len = buf.length, mono = new Float32Array(len);
+  for (let c = 0; c < n; c++) { const d = buf.getChannelData(c); for (let i = 0; i < len; i++) mono[i] += d[i] / n; }
+  if (buf.sampleRate === 16000) return mono;
+  const ratio = buf.sampleRate / 16000, out = new Float32Array(Math.floor(len / ratio));
+  for (let i = 0; i < out.length; i++) {           // усреднение по окну: простой фильтр от наложения частот
+    const a = Math.floor(i * ratio), z = Math.min(len, Math.floor((i + 1) * ratio));
+    let s = 0; for (let j = a; j < z; j++) s += mono[j];
+    out[i] = s / Math.max(1, z - a);
+  }
+  return out;
+}
+async function fragmentAudio(b, f) {
+  const ch = b.chapters[f.ch];
+  const blob = await getFile(ch.key);
+  if (!blob) throw new Error('Файл главы не найден');
+  const pad = 1.0, s0 = Math.max(0, f.start - pad), s1 = Math.min(f.end + pad, s0 + ASR_MAX_SEC);
+  const isMp3 = /mpeg|mp3/i.test(blob.type) || /\.mp3$/i.test(ch.name || '');
+  const part = isMp3 && ch.duration ? await mp3Slice(blob, s0, s1, ch.duration) : blob;
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  const ctx = new Ctx();
+  let decoded;
+  try { decoded = await ctx.decodeAudioData(await part.arrayBuffer()); } finally { try { ctx.close(); } catch {} }
+  let pcm = toMono16k(decoded);
+  if (part === blob) pcm = pcm.slice(Math.floor(s0 * 16000), Math.ceil(s1 * 16000));
+  return pcm;
+}
+function transcribe(b, f, { auto } = {}) {
+  if (asrState.has(f.id)) return Promise.resolve();
+  if (auto && !asrReady()) { renderTranscript(b, f); return Promise.resolve(); }
+  const model = asrModelKey();
+  const st = { stage: 'prep', pct: 0, files: {} };
+  asrState.set(f.id, st); renderTranscript(b, f);
+  return new Promise(async resolve => {
+    const finish = msg => {
+      asrState.delete(f.id); asrJobs.delete(id);
+      if (msg) toast(msg, 4000);
+      renderTranscript(b, f); renderAI(b, f); resolve();
+    };
+    const id = ++asrSeq;
+    let audioData;
+    try { audioData = await fragmentAudio(b, f); }
+    catch (e) { finish('Не получилось прочитать звук фрагмента'); return; }
+    asrJobs.set(id, async m => {
+      if (m.type === 'download') {
+        st.stage = 'download'; st.files[m.file] = [m.loaded, m.total];
+        const v = Object.values(st.files); st.pct = v.reduce((s, x) => s + x[0], 0) / Math.max(1, v.reduce((s, x) => s + x[1], 0));
+        renderTranscript(b, f, true);
+      } else if (m.type === 'running') {
+        st.stage = 'run'; lsSet('ap-asr-ready', model); renderTranscript(b, f, true);
+      } else if (m.type === 'done') {
+        if (m.text) { f.text = m.text; f.textAuto = true; await putBook(b); }
+        finish(m.text ? '' : 'Речь в этом месте не распозналась');
+      } else if (m.type === 'error') {
+        finish(/fetch|network|Failed to load/i.test(m.message) ? 'Не получилось скачать модель. Проверьте интернет' : 'Расшифровка не получилась. Попробуйте ещё раз');
+      }
+    });
+    try { asrGetWorker().postMessage({ id, model: ASR_MODELS[model].id, audio: audioData }, [audioData.buffer]); }
+    catch (e) { finish('Этот браузер не умеет расшифровывать в фоне'); }
+  });
+}
+let trSel = '', trView = null;
+function renderTranscript(b, f, progressOnly) {
+  const el = document.getElementById('tr'); if (!el || trView !== f) return;
+  const st = asrState.get(f.id);
+  if (st) {
+    const label = st.stage === 'download' ? `Скачиваю модель распознавания · ${Math.round(st.pct * 100)}%`
+      : st.stage === 'run' ? 'Расшифровываю…' : 'Готовлю звук…';
+    if (progressOnly && el.querySelector('.tr-prog')) {
+      el.querySelector('.tr-lbl').textContent = label;
+      el.querySelector('.tr-prog i').style.width = st.stage === 'download' ? (st.pct * 100).toFixed(1) + '%' : '';
+      el.querySelector('.tr-prog').classList.toggle('indet', st.stage !== 'download');
+      return;
+    }
+    el.innerHTML = `<div class="tr-box"><div class="thinking tr-lbl">${label}</div><div class="pbar tr-prog ${st.stage !== 'download' ? 'indet' : ''}"><i style="width:${st.stage === 'download' ? (st.pct * 100).toFixed(1) : 0}%"></i></div>
+      <div class="tr-hint">${st.stage === 'download' ? 'Это один раз. Дальше расшифровка работает без интернета.' : 'Минута звука на телефоне расшифровывается примерно за минуту. Окно можно закрыть, текст сохранится сам.'}</div></div>`;
+    return;
+  }
+  if (!f.text) {
+    const m = ASR_MODELS[asrModelKey()];
+    el.innerHTML = `<div class="tr-box"><button class="btn primary sm" id="tr-go">Расшифровать в текст</button>
+      <div class="tr-hint">${asrReady() ? 'Расшифровка идёт прямо на телефоне.' : `Один раз скачается модель распознавания (${m.label}, ${m.size}), дальше всё работает на телефоне без интернета.`}
+      <button class="lnk" id="tr-model">Модель: ${m.label}</button></div></div>`;
+    el.querySelector('#tr-go').onclick = () => transcribe(b, f);
+    el.querySelector('#tr-model').onclick = () => asrModelSheet(b, f);
+    return;
+  }
+  el.innerHTML = `<div class="tr-head"><span>Текст фрагмента</span><span class="tr-saved" id="tr-saved"></span></div>
+    <textarea id="tr-text" class="tr-text" aria-label="Текст фрагмента">${esc(f.text)}</textarea>
+    <div class="selbar" id="selbar" hidden>
+      <div class="sel-q" id="sel-q"></div>
+      <form class="ask" id="sel-form"><input id="sel-in" placeholder="Вопрос про выделенное" autocomplete="off" enterkeyhint="send" aria-label="Вопрос про выделенное"><button class="btn primary sm">Спросить</button></form>
+      <button class="btn ghost sm" id="sel-viz">Визуализировать выделенное</button>
+    </div>
+    <div class="tr-hint">Поправьте ошибки распознавания прямо в тексте. Выделите кусок, чтобы спросить про него. <button class="lnk" id="tr-redo">Расшифровать заново</button></div>`;
+  const ta = el.querySelector('#tr-text'), bar = el.querySelector('#selbar');
+  const grow = () => { ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight + 2, 360) + 'px'; };
+  grow();
+  let saveT;
+  ta.addEventListener('input', () => {
+    grow(); clearTimeout(saveT);
+    saveT = setTimeout(async () => { f.text = ta.value; f.textAuto = false; await putBook(b); const sv = document.getElementById('tr-saved'); if (sv) { sv.textContent = 'Сохранено'; setTimeout(() => { sv.textContent = ''; }, 1500); } }, 600);
+  });
+  const readSel = () => {
+    const t = ta.value.slice(ta.selectionStart, ta.selectionEnd).trim();
+    if (t.length >= 2) { trSel = t; bar.hidden = false; el.querySelector('#sel-q').textContent = '«' + (t.length > 220 ? t.slice(0, 220) + '…' : t) + '»'; }
+  };
+  ['select', 'mouseup', 'keyup', 'touchend'].forEach(ev => ta.addEventListener(ev, () => setTimeout(readSel, 0)));
+  document.addEventListener('selectionchange', function onSel() {
+    if (!document.body.contains(ta)) { document.removeEventListener('selectionchange', onSel); return; }
+    if (document.activeElement === ta) readSel();
+  });
+  el.querySelector('#sel-form').onsubmit = e => {
+    e.preventDefault();
+    const q = el.querySelector('#sel-in').value.trim(); if (!q || !trSel) return;
+    el.querySelector('#sel-in').value = '';
+    if (sample) runAI(b, f, 'qa', q, trSel); else openLink(claudeLink(b, f, 'qa', q, trSel));
+  };
+  el.querySelector('#sel-viz').onclick = () => { if (!trSel) return; if (sample) runAI(b, f, 'viz', null, trSel); else openLink(claudeLink(b, f, 'viz', null, trSel)); };
+  el.querySelector('#tr-redo').onclick = () => {
+    const r = el.querySelector('#tr-redo');
+    if (!r.dataset.sure && !f.textAuto) { r.dataset.sure = '1'; r.textContent = 'Ваши правки пропадут. Точно?'; return; }
+    f.text = ''; transcribe(b, f);
+  };
+}
+function asrModelSheet(b, f) {
+  const cur = asrModelKey();
+  openSheet(`<h3>Модель распознавания</h3><p>Обе работают прямо на телефоне. Скачивается один раз.</p><div class="opts">
+    ${Object.entries(ASR_MODELS).map(([k, m]) => `<button class="opt ${k === cur ? 'sel' : ''}" data-m="${k}"><span>${m.label[0].toUpperCase() + m.label.slice(1)} · ${m.size}</span><span>${k === 'base' ? 'быстрее' : 'лучше узнаёт имена'}</span></button>`).join('')}
+  </div>`, el => {
+    el.querySelectorAll('[data-m]').forEach(x => x.onclick = () => { lsSet('ap-asr-model', x.dataset.m); fragmentSheet(b, f); });
+  });
 }
 
 /* ---------- Claude: visualize, explain, ask ---------- */
@@ -1263,7 +1483,7 @@ ${f.text ? `Текст фрагмента:\n"""\n${f.text.slice(0, 12000)}\n"""`
 }
 const PROMPTS = {
   explain: `${RULES}\n\nОбъясни этот момент: что происходит, кто участвует, почему это важно и какие детали легко пропустить на слух. 3–6 коротких абзацев без заголовков. Ключевые слова можно выделять **так**.\n\n`,
-  qa: `${RULES}\n\nОтветь на вопрос слушателя об этом моменте. Коротко и по делу, не больше 5 абзацев. Ключевые слова можно выделять **так**.\n\n`,
+  qa: `${RULES}\n\nОтветь на вопрос слушателя. Обычно вопрос о книге, но не обязательно об этом фрагменте: о сюжете до этого места, персонажах, мире книги, авторе. Фрагмент и место в книге ниже — подсказка, где сейчас слушатель, а не рамка для ответа. Коротко и по делу, не больше 5 абзацев. Ключевые слова можно выделять **так**.\n\n`,
   viz: `${RULES}\n\nНарисуй визуализацию этого момента книги в SVG. Выбери форму, которая лучше всего помогает понять момент: иллюстрация сцены, схема места действия, карта связей персонажей или шкала событий.
 Требования к SVG: корневой тег <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500">; первый элемент — прямоугольник фона на весь viewBox; у каждой фигуры явный fill; спокойная гармоничная палитра; подписи по-русски, font-family="sans-serif", размер шрифта не меньше 16, подписи не налезают друг на друга и не выходят за край; без <script>, <foreignObject>, <image>, ссылок и внешних шрифтов.
 Ответь только JSON-объектом: {"caption": "одно предложение о том, что изображено", "svg": "<svg ...>...</svg>"}\n\n`,
@@ -1294,9 +1514,14 @@ const svgSrc = svg => 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(s
 
 // вне Claude (приложение на телефоне) — открываем Claude с уже составленным запросом
 const VIZ_LINK = `${RULES}\n\nВизуализируй этот момент книги: нарисуй то, что лучше всего поможет его понять — иллюстрацию сцены, схему места действия, карту связей персонажей или шкалу событий.\n\n`;
-function claudeLink(b, f, kind, q) {
+function quotePart(kind, quote) {
+  if (!quote) return '';
+  return kind === 'viz' ? `\n\nВизуализируй именно этот кусок, который слушатель выделил в тексте:\n«${quote}»`
+    : `\n\nСлушатель выделил в тексте этот кусок, вопрос про него:\n«${quote}»`;
+}
+function claudeLink(b, f, kind, q, quote) {
   const head = kind === 'viz' ? VIZ_LINK : PROMPTS[kind];
-  const text = head + fragContext(b, f) + (kind === 'qa' ? `\n\nВопрос слушателя: ${q}` : '');
+  const text = head + fragContext(b, f) + quotePart(kind, quote) + (kind === 'qa' ? `\n\nВопрос слушателя: ${q}` : '');
   return 'https://claude.ai/new?q=' + encodeURIComponent(text);
 }
 function openLink(href) { const a = document.createElement('a'); a.href = href; a.target = '_blank'; a.rel = 'noopener'; document.body.appendChild(a); a.click(); a.remove(); }
@@ -1319,7 +1544,7 @@ function renderAI(b, f) {
   if (a.viz) h += `<div class="ans viz"><div class="q">Визуализация</div><img alt="${esc(a.viz.caption || 'Визуализация фрагмента')}" src="${svgSrc(a.viz.svg)}">${a.viz.caption ? `<div>${esc(a.viz.caption)}</div>` : ''}<div class="foot"><span>${when(a.viz.at)}</span>${sample && !aiBusy ? '<button data-k="viz">Нарисовать заново</button>' : ''}</div></div>`;
   if (a.explain) h += `<div class="ans"><div class="q">Объяснение</div><div class="tx">${md(a.explain.text)}</div><div class="foot"><span>${when(a.explain.at)}</span>${sample && !aiBusy ? '<button data-k="explain">Объяснить заново</button>' : ''}</div></div>`;
   for (const qa of (a.qa || []).slice().reverse())
-    h += `<div class="ans"><div class="q">${esc(qa.q)}</div><div class="tx">${md(qa.a)}</div><div class="foot"><span>${when(qa.at)}</span></div></div>`;
+    h += `<div class="ans">${qa.quote ? `<div class="sel-q">«${esc(qa.quote)}»</div>` : ''}<div class="q">${esc(qa.q)}</div><div class="tx">${md(qa.a)}</div><div class="foot"><span>${when(qa.at)}</span></div></div>`;
   el.innerHTML = h;
   el.querySelectorAll('[data-k]').forEach(x => x.onclick = () => runAI(b, f, x.dataset.k));
   const form = el.querySelector('#ask');
@@ -1334,12 +1559,12 @@ function renderAI(b, f) {
   const stop = el.querySelector('#ai-stop');
   if (stop) stop.onclick = () => aiCtl?.abort();
 }
-async function runAI(b, f, kind, q) {
+async function runAI(b, f, kind, q, quote) {
   if (!sample || aiBusy) return;
   aiBusy = { fid: f.id, kind, label: kind === 'viz' ? 'Визуализация' : kind === 'explain' ? 'Объяснение' : q };
   const ctl = aiCtl = new AbortController();
   renderAI(b, f);
-  const input = PROMPTS[kind] + fragContext(b, f) + (kind === 'qa' ? `\n\nВопрос слушателя: ${q}` : '');
+  const input = PROMPTS[kind] + fragContext(b, f) + quotePart(kind, quote) + (kind === 'qa' ? `\n\nВопрос слушателя: ${q}` : '');
   try {
     if (kind === 'viz') {
       const r = await sample.json(input, { signal: ctl.signal, cache: false });
@@ -1352,7 +1577,7 @@ async function runAI(b, f, kind, q) {
         if (live && aiView?.f === f) live.innerHTML = md(text);
       } });
       if (kind === 'explain') f.answers.explain = { text, at: Date.now() };
-      else (f.answers.qa = f.answers.qa || []).push({ q, a: text, at: Date.now() });
+      else (f.answers.qa = f.answers.qa || []).push({ q, a: text, at: Date.now(), quote: quote || '' });
     }
     await putBook(b);
   } catch (e) {
@@ -1366,8 +1591,8 @@ async function runAI(b, f, kind, q) {
 }
 
 /* ---------- быстрый вопрос по книге: где я сейчас, без спойлеров ---------- */
-const ASK_RULES = `Ты помогаешь человеку, который слушает аудиокнигу и что-то забыл или не понял. Отвечай по-русски, коротко и по делу, 1–4 абзаца. Ключевые имена можно выделять **так**.
-Опирайся только на то, что произошло в книге до места, где сейчас слушатель. Ничего не раскрывай из того, что будет дальше, даже намёками. Если честный ответ требует спойлера, скажи, что это выяснится позже.
+const ASK_RULES = `Ты помогаешь человеку, который слушает аудиокнигу. Обычно он спрашивает о книге: что-то забыл или не понял, хочет вспомнить персонажа, разобраться в мире книги, узнать об авторе. Вопрос не обязательно про текущий момент. Место в книге ниже — подсказка, где он сейчас, а не рамка для ответа. Отвечай по-русски, коротко и по делу, 1–4 абзаца. Ключевые имена можно выделять **так**.
+Когда речь о сюжете, опирайся только на то, что произошло до места, где сейчас слушатель. Ничего не раскрывай из того, что будет дальше, даже намёками. Если честный ответ требует спойлера, скажи, что это выяснится позже.
 Если не уверен, что именно уже произошло к этому месту, скажи об этом одной фразой и не выдумывай.`;
 let askBusy = null, askCtl = null;
 function askWhere(b) {
@@ -1385,7 +1610,7 @@ function askSheet(b) {
   const w = askWhere(b);
   openSheet(`<h3>Спросить Claude</h3>
     <p class="num">Часть ${b.pos.ch + 1} · ${fmt(w.t)}${w.pct != null ? ` · ${w.pct}% книги` : ''} · без спойлеров</p>
-    <form class="ask" id="q-form"><input id="q-in" placeholder="Например: кто такой Крауч?" autocomplete="off" enterkeyhint="send" aria-label="Вопрос по книге"><button class="btn primary sm" id="q-go">Спросить</button></form>
+    <form class="ask" id="q-form"><input id="q-in" placeholder="Спросите что угодно: кто такой Крауч?" autocomplete="off" enterkeyhint="send" aria-label="Вопрос по книге"><button class="btn primary sm" id="q-go">Спросить</button></form>
     <div id="q-note"></div>
     <div class="asks" id="q-list"></div>`, el => {
     el.querySelector('#q-form').onsubmit = e => {
