@@ -25,7 +25,7 @@
 *{box-sizing:border-box}
 html,body{min-height:100%}
 body{background:var(--bg);color:var(--fg);font-family:var(--font);font-size:15px;line-height:1.45;-webkit-font-smoothing:antialiased;transition:background .2s,color .2s}
-button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;-webkit-tap-highlight-color:transparent}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;cursor:pointer;-webkit-tap-highlight-color:transparent}
 button:focus-visible,input:focus-visible,label:focus-within{outline:2px solid var(--accent);outline-offset:2px}
 svg{display:block}
 .num{font-variant-numeric:tabular-nums}
@@ -61,7 +61,7 @@ main{padding-block:8px 140px}
 .cont .bar{flex:1;min-width:0}
 
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:24px 16px}
-.book{display:flex;flex-direction:column;gap:10px;text-align:left;min-width:0}
+.book{display:flex;flex-direction:column;gap:10px;text-align:left;min-width:0;align-self:start;width:100%}
 .book .cov{transition:transform .15s}
 .book:hover .cov{transform:translateY(-2px)}
 .book b{font-weight:600;font-size:15px;line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
@@ -75,7 +75,7 @@ main{padding-block:8px 140px}
 .pbar{height:4px;border-radius:2px;background:var(--line);overflow:hidden}
 .pbar i{display:block;height:100%;background:var(--accent);border-radius:2px}
 
-.add-tile{aspect-ratio:1;border-radius:var(--r-m);border:1.5px dashed var(--fg-3);display:grid;place-items:center;color:var(--fg-2);text-align:center;font-size:13px;font-weight:500;padding:12px}
+.add-tile{align-self:start;width:100%;aspect-ratio:1;border-radius:var(--r-m);border:1.5px dashed var(--fg-3);display:grid;place-items:center;color:var(--fg-2);text-align:center;font-size:13px;font-weight:500;padding:12px}
 .add-tile:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
 .add-tile div{display:grid;justify-items:center;gap:8px}
 

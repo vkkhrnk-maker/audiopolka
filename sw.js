@@ -1,5 +1,5 @@
 // Офлайн-кэш оболочки приложения. Сами книги лежат в IndexedDB и через этот файл не проходят.
-const VERSION = '10eb3450c9';
+const VERSION = 'c824182e9e';
 const CACHE = `audiopolka-${VERSION}`;
 const SHELL = ['./', 'index.html', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'];
 
