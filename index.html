@@ -41,7 +41,10 @@ body{margin:0}img{max-width:100%}[hidden]{display:none!important}
   --danger:#FF5247; --scrim:rgba(0,0,0,.6); --shadow:0 8px 32px rgba(0,0,0,.5); color-scheme:dark;
 }
 *{box-sizing:border-box}
-html,body{min-height:100%}
+html,body{min-height:100%;overscroll-behavior-y:none}
+html,body,.player{scrollbar-width:none}
+html::-webkit-scrollbar,body::-webkit-scrollbar,.player::-webkit-scrollbar{display:none}
+html{overflow-x:hidden}
 body{background:var(--bg);color:var(--fg);font-family:var(--font);font-size:15px;line-height:1.45;-webkit-font-smoothing:antialiased;transition:background .2s,color .2s}
 button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;cursor:pointer;-webkit-tap-highlight-color:transparent}
 button:focus-visible,input:focus-visible,label:focus-within{outline:2px solid var(--accent);outline-offset:2px}
@@ -63,20 +66,12 @@ header.top .wrap{display:flex;align-items:center;gap:12px;padding-block:16px;fle
 .btn.ghost:hover{background:var(--surface-2)}
 .btn.danger{background:var(--danger);color:#fff}
 
-main{padding-block:8px 140px}
+main{padding-block:8px 32px}
+body.has-mini main{padding-bottom:calc(112px + env(safe-area-inset-bottom,0px))}
 .section-h{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin:24px 0 14px}
 .section-h h2{margin:0;font-size:22px;font-weight:700;letter-spacing:-.01em}
 .section-h span{color:var(--fg-2);font-size:13px}
 
-/* continue card */
-.cont{display:grid;grid-template-columns:120px 1fr;gap:20px;align-items:center;background:var(--surface);border-radius:var(--r-l);padding:16px;cursor:pointer;text-align:left;width:100%}
-.cont:hover{background:var(--surface-2)}
-.cont .eyebrow{font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--accent)}
-.cont h3{margin:4px 0 2px;font-size:22px;line-height:1.2;text-wrap:balance}
-.cont .meta{color:var(--fg-2);font-size:14px}
-.cont .row{display:flex;align-items:center;gap:14px;margin-top:14px}
-.cont .play{width:48px;height:48px;border-radius:50%;background:var(--accent);color:var(--accent-fg);display:grid;place-items:center;flex:none}
-.cont .bar{flex:1;min-width:0}
 
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:24px 16px}
 .book{display:flex;flex-direction:column;gap:10px;text-align:left;min-width:0;align-self:start;width:100%}
@@ -213,8 +208,6 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.25)}
   .pl-title{text-align:center}.pl-title .ch{justify-content:center}
 }
 @media (max-width:520px){
-  .cont{grid-template-columns:88px 1fr;gap:14px}
-  .cont h3{font-size:18px}
   .grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:20px 12px}
   .seg button .tx{display:none}
   .ctrls{gap:4px}
@@ -563,23 +556,7 @@ function render() {
     $('#e-files').onclick = () => $('#f-files').click();
     return;
   }
-  const top = sorted.find(b => b.last && !b.finished);
   let html = warn;
-  if (top) {
-    const p = progress(top), ch = top.chapters[top.pos.ch];
-    html += `<div class="section-h"><h2>Продолжить</h2></div>
-    <button class="cont" data-open="${top.id}">
-      <div class="cov">${coverHTML(top)}</div>
-      <div style="min-width:0">
-        <div class="eyebrow">Глава ${top.pos.ch+1} из ${top.chapters.length}</div>
-        <h3>${esc(top.title)}</h3>
-        <div class="meta">${esc(top.author || ch?.name || '')}</div>
-        <div class="row"><span class="play" data-resume="${top.id}">${cur?.id===top.id && !audio.paused ? I.pause : I.play}</span>
-          <div class="bar"><div class="pbar"><i style="width:${(p*100).toFixed(1)}%"></i></div>
-          <div class="meta num" style="font-size:12px;margin-top:6px">Осталось ${human((total(top)-listened(top))/(top.speed||1))}</div></div></div>
-      </div>
-    </button>`;
-  }
   html += `<div class="section-h"><h2>Все книги</h2><span class="num">${books.length} ${plural(books.length,'книга','книги','книг')}</span></div><div class="grid">`;
   for (const b of sorted) {
     const p = progress(b);
@@ -593,7 +570,6 @@ function render() {
   m.innerHTML = html;
   m.querySelectorAll('[data-open]').forEach(el => el.onclick = e => {
     const b = books.find(x => x.id === el.dataset.open);
-    if (e.target.closest('[data-resume]')) { e.stopPropagation(); if (cur?.id === b.id) toggle(); else load(b, true); renderMini(); render(); return; }
     openPlayer(b);
   });
   $('#g-add').onclick = () => $('#add-btn').click();
@@ -726,10 +702,12 @@ function sleepLabel() {
 /* ---------- mini player ---------- */
 function renderMini() {
   const el = $('#mini');
-  if (!cur || $('#player').classList.contains('open')) { el.hidden = true; return; }
+  const show = !!cur && !$('#player').classList.contains('open');
+  document.body.classList.toggle('has-mini', !!cur);
+  if (!show) { el.hidden = true; return; }
   el.hidden = false;
   el.innerHTML = `<div class="in"><div class="row">
-    <button class="open" id="m-open"><div class="cov">${coverHTML(cur)}</div><div class="t"><b>${esc(cur.title)}</b><small>${esc(cur.chapters[cur.pos.ch]?.name||'')}</small></div></button>
+    <button class="open" id="m-open"><div class="cov">${coverHTML(cur)}</div><div class="t"><b>${esc(cur.title)}</b><small class="num">${esc(cur.chapters[cur.pos.ch]?.name||'')} · осталось ${human((total(cur)-listened(cur))/(cur.speed||1))}</small></div></button>
     <button class="ibtn" id="m-back" aria-label="Назад на 15 секунд" style="position:relative">${I.back.replace(/30/g,'26')}</button>
     <button class="ibtn acc" id="m-play" aria-label="${audio.paused?'Слушать':'Пауза'}">${audio.paused ? I.play : I.pause}</button>
   </div><div class="line"><i id="m-line"></i></div></div>`;
