@@ -261,6 +261,8 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.25)}
 .thinking::before{content:"";width:14px;height:14px;border-radius:50%;border:2px solid var(--accent);border-top-color:transparent;animation:spin .8s linear infinite;flex:none}
 @keyframes spin{to{transform:rotate(360deg)}}
 .lnk{color:var(--accent);font-weight:600;text-decoration:underline;text-underline-offset:2px;font-size:inherit}
+.ai-seg{margin:4px 0 10px;width:max-content;max-width:100%}
+.ai-seg button{height:36px;padding:0 14px}
 .ai-key-row{display:flex;justify-content:flex-end;font-size:13px}
 .asks{display:grid;gap:10px;margin-top:12px}
 #q-note .ai-off{margin-top:10px}
@@ -797,7 +799,7 @@ function openPlayer(b) {
           <button class="ibtn skip" id="p-f30" aria-label="Вперёд на 30 секунд">${I.fwd}<small>30</small></button>
           <button class="ibtn" id="p-next" aria-label="Следующая глава">${I.next}</button>
         </div>
-        <div class="chips"><button class="chip" id="p-speed"></button><button class="chip" id="p-sleep">${I.timer}<span></span></button><button class="chip" id="p-mark">${I.mark}<span>Отметить фрагмент</span></button><button class="chip" id="p-ask">${I.chat}<span>Спросить Claude</span></button></div>
+        <div class="chips"><button class="chip" id="p-speed"></button><button class="chip" id="p-sleep">${I.timer}<span></span></button><button class="chip" id="p-mark">${I.mark}<span>Отметить фрагмент</span></button><button class="chip" id="p-ask">${I.chat}<span>Спросить ${aiName()}</span></button></div>
         <div class="left-book num" id="p-left"></div>
       </div>
       <div class="chapters">
@@ -1074,32 +1076,103 @@ function apiSample() {
     const t = await run(input, { ...opts, json: true });
     try { return JSON.parse(t); } catch { throw { code: 'invalid_json' }; }
   };
-  s.viaKey = true;
+  s.viaKey = true; s.provider = 'claude';
   return s;
 }
-if (!window.claude && getKey()) sample = apiSample();
-function keySheet() {
-  const has = !!getKey();
-  openSheet(`<h3>Claude в Аудиополке</h3>
-    <p>Чтобы «Визуализируй это», «Объясни» и вопросы отвечали прямо здесь, вставьте ключ API Anthropic. Ключ хранится только на этом устройстве, запросы идут напрямую в Anthropic. Оплата по факту использования с вашего аккаунта.</p>
-    <p>Ключ создаётся на <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a> в разделе API Keys.</p>
-    <div class="field"><label for="k-in">Ключ API</label><input id="k-in" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="sk-ant-…" value="${has ? '••••••••' : ''}"></div>
+// Gemini (бесплатный тариф Google AI Studio): прямые запросы к REST API, ключ только на устройстве
+const GEMINI_KEY = 'ap-gemini-key', GEMINI_MODEL = 'gemini-flash-latest';
+const getGeminiKey = () => { try { return localStorage.getItem(GEMINI_KEY) || ''; } catch { return ''; } };
+function geminiSample() {
+  const base = 'https://generativelanguage.googleapis.com/v1beta/models/' + GEMINI_MODEL;
+  const fail = async r => {
+    let j = null; try { j = await r.json(); } catch {}
+    const m = (j?.error?.message || '') + ' ' + (j?.error?.status || '');
+    if (r.status === 401 || r.status === 403 || /API key|API_KEY/i.test(m)) throw { code: 'bad_key' };
+    if (r.status === 429) throw { code: 'rate_limited' };
+    throw { code: 'other' };
+  };
+  const take = j => {
+    if (j?.promptFeedback?.blockReason) throw { code: 'refused' };
+    const c = j?.candidates?.[0];
+    if (/SAFETY|PROHIBITED|BLOCKLIST/.test(c?.finishReason || '')) throw { code: 'refused' };
+    return (c?.content?.parts || []).filter(x => !x.thought).map(x => x.text || '').join('');
+  };
+  const call = async (input, { signal, onText, json } = {}) => {
+    const body = { contents: [{ role: 'user', parts: [{ text: input }] }] };
+    if (json) body.generationConfig = { responseMimeType: 'application/json',
+      responseSchema: { type: 'OBJECT', properties: { caption: { type: 'STRING' }, svg: { type: 'STRING' } }, required: ['caption', 'svg'] } };
+    let r;
+    try {
+      r = await fetch(base + (json ? ':generateContent' : ':streamGenerateContent?alt=sse'), {
+        method: 'POST', signal, body: JSON.stringify(body),
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': getGeminiKey() } });
+    } catch (e) { throw { code: signal?.aborted ? 'cancelled' : 'offline' }; }
+    if (!r.ok) await fail(r);
+    if (json) return take(await r.json());
+    const reader = r.body.getReader(), dec = new TextDecoder();
+    let buf = '', text = '';
+    try {
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        let i;
+        while ((i = buf.indexOf('\n')) >= 0) {
+          const line = buf.slice(0, i).trim(); buf = buf.slice(i + 1);
+          if (!line.startsWith('data:')) continue;
+          let j; try { j = JSON.parse(line.slice(5)); } catch { continue; }
+          text += take(j); onText?.({ text });
+        }
+      }
+    } catch (e) { if (e?.code) throw e; throw { code: signal?.aborted ? 'cancelled' : 'offline' }; }
+    if (!text.trim()) throw { code: 'empty_completion' };
+    return text;
+  };
+  const s = async (input, opts = {}) => ({ text: await call(input, opts) });
+  s.json = async (input, opts = {}) => { const t = await call(input, { ...opts, json: true }); try { return JSON.parse(t); } catch { throw { code: 'invalid_json' }; } };
+  s.viaKey = true; s.provider = 'gemini';
+  return s;
+}
+const AI_NAMES = { claude: 'Claude', gemini: 'Gemini' };
+const aiProvider = () => { try { const v = localStorage.getItem('ap-ai-provider'); if (AI_NAMES[v]) return v; } catch {} return getKey() ? 'claude' : getGeminiKey() ? 'gemini' : 'claude'; };
+const aiName = () => sample?.viaKey ? AI_NAMES[sample.provider] : 'Claude';
+function makeSample() {
+  const pv = aiProvider();
+  if (pv === 'gemini' && getGeminiKey()) return geminiSample();
+  if (pv === 'claude' && getKey()) return apiSample();
+  return null;
+}
+if (!window.claude) sample = makeSample();
+function keySheet(pv = aiProvider()) {
+  const isG = pv === 'gemini', store = isG ? GEMINI_KEY : KEY_STORE;
+  const has = !!(isG ? getGeminiKey() : getKey());
+  const info = isG
+    ? `<p>Бесплатно: ключ выдают в <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a> (кнопка «Create API key»), лимитов бесплатного тарифа для личного пользования хватает. На бесплатном тарифе Google может использовать запросы для улучшения своих продуктов.</p>`
+    : `<p>Оплата по факту использования с вашего аккаунта Anthropic. Ключ создаётся на <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a> в разделе API Keys.</p>`;
+  openSheet(`<h3>ИИ в Аудиополке</h3>
+    <p>Чтобы визуализация, объяснения и вопросы отвечали прямо здесь, подключите сервис по ключу. Ключ хранится только на этом устройстве, запросы идут напрямую в сервис.</p>
+    <div class="seg ai-seg" role="group" aria-label="Сервис"><button data-pv="gemini" aria-pressed="${isG}">Gemini · бесплатно</button><button data-pv="claude" aria-pressed="${!isG}">Claude</button></div>
+    ${info}
+    <div class="field"><label for="k-in">Ключ API ${AI_NAMES[pv]}</label><input id="k-in" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${isG ? 'AIza…' : 'sk-ant-…'}" value="${has ? '••••••••' : ''}"></div>
     <div class="acts">${has ? '<button class="btn ghost" data-a="del">Отключить</button>' : '<button class="btn ghost" data-a="no">Отмена</button>'}<button class="btn primary" data-a="ok">Сохранить</button></div>`, el => {
+    el.querySelectorAll('[data-pv]').forEach(x => x.onclick = () => { if (x.dataset.pv !== pv) keySheet(x.dataset.pv); });
     const inp = el.querySelector('#k-in');
     inp.onfocus = () => { if (inp.value === '••••••••') inp.value = ''; };
     el.querySelector('[data-a=no]')?.addEventListener('click', () => closeSheet());
     el.querySelector('[data-a=del]')?.addEventListener('click', () => {
-      try { localStorage.removeItem(KEY_STORE); } catch {}
-      apiClientP = null; if (sample?.viaKey) sample = null;
-      closeSheet(); refreshAI(); toast('Claude отключён');
+      try { localStorage.removeItem(store); } catch {}
+      if (!isG) apiClientP = null;
+      if (sample?.viaKey && sample.provider === pv) sample = makeSample();
+      closeSheet(); refreshAI(); toast(`${AI_NAMES[pv]} отключён`);
     });
     el.querySelector('[data-a=ok]').onclick = () => {
       const v = inp.value.trim();
-      if (v === '••••••••' || (!v && has)) { closeSheet(); return; }
-      if (!/^sk-ant-/.test(v)) { toast('Ключ должен начинаться с sk-ant-'); return; }
-      try { localStorage.setItem(KEY_STORE, v); } catch { toast('Не получилось сохранить ключ на устройстве'); return; }
-      apiClientP = null; sample = apiSample();
-      closeSheet(); refreshAI(); toast('Claude подключён');
+      if (v === '••••••••' || (!v && has)) { try { localStorage.setItem('ap-ai-provider', pv); } catch {} sample = makeSample(); closeSheet(); refreshAI(); return; }
+      if (isG ? !/^AIza/.test(v) : !/^sk-ant-/.test(v)) { toast(isG ? 'Ключ Gemini начинается с AIza' : 'Ключ должен начинаться с sk-ant-'); return; }
+      try { localStorage.setItem(store, v); localStorage.setItem('ap-ai-provider', pv); } catch { toast('Не получилось сохранить ключ на устройстве'); return; }
+      if (!isG) apiClientP = null;
+      sample = makeSample();
+      closeSheet(); refreshAI(); toast(`${AI_NAMES[pv]} подключён`);
     };
   });
 }
@@ -1472,18 +1545,18 @@ const PROMPTS = {
 function aiError(code) {
   return ({
     not_granted: 'Claude не разрешён для этой страницы. Разрешение можно дать в меню артефакта',
-    bad_key: 'Ключ API не подошёл. Проверьте его: «Спросить Claude» → «Ключ API»',
+    bad_key: 'Ключ API не подошёл. Проверьте его в настройках ключа',
     no_credit: 'На аккаунте Anthropic закончились средства. Пополните баланс в консоли',
-    offline: 'Нет связи с Claude. Проверьте интернет',
+    offline: 'Нет связи с ИИ. Проверьте интернет',
     sampling_disabled: 'Claude недоступен для этого аккаунта',
     rate_limited: 'Слишком много запросов. Попробуйте чуть позже',
     session_expired: 'Нужно заново войти в Claude',
-    refused: 'Claude не стал отвечать на этот запрос. Попробуйте сформулировать иначе',
+    refused: `${aiName()} не стал отвечать на этот запрос. Попробуйте сформулировать иначе`,
     invalid_json: 'Картинка не получилась. Попробуйте ещё раз',
     bad_svg: 'Картинка не получилась. Попробуйте ещё раз',
     prompt_too_large: 'Текст фрагмента слишком длинный. Сократите его',
-    empty_completion: 'Claude ничего не ответил. Попробуйте ещё раз',
-  })[code] || 'Не получилось связаться с Claude. Попробуйте ещё раз';
+    empty_completion: `${aiName()} ничего не ответил. Попробуйте ещё раз`,
+  })[code] || `Не получилось связаться с ${aiName()}. Попробуйте ещё раз`;
 }
 function md(s) {
   return String(s || '').trim().split(/\n{2,}/).map(p =>
@@ -1506,22 +1579,25 @@ function claudeLink(b, f, kind, q, quote) {
   return 'https://claude.ai/new?q=' + encodeURIComponent(text);
 }
 function openLink(href) { const a = document.createElement('a'); a.href = href; a.target = '_blank'; a.rel = 'noopener'; document.body.appendChild(a); a.click(); a.remove(); }
-function refreshAI() { if (aiView && document.getElementById('ai')) renderAI(aiView.b, aiView.f); }
+function refreshAI() {
+  const pa = document.querySelector('#p-ask span'); if (pa) pa.textContent = 'Спросить ' + aiName();
+  if (aiView && document.getElementById('ai')) renderAI(aiView.b, aiView.f);
+}
 function renderAI(b, f) {
   aiView = { b, f };
   const el = document.getElementById('ai'); if (!el) return;
   const a = f.answers || (f.answers = {});
   const busy = aiBusy && aiBusy.fid === f.id ? aiBusy : null;
   const dis = aiBusy ? 'disabled' : '';
-  let h = '<div class="ai-h">Спросить Claude</div>';
+  let h = `<div class="ai-h">Спросить ${aiName()}</div>`;
   if (!sample) h += `<div class="ai-btns"><a class="btn primary sm" href="${claudeLink(b, f, 'viz')}" target="_blank" rel="noopener">Визуализируй это</a><a class="btn ghost sm" href="${claudeLink(b, f, 'explain')}" target="_blank" rel="noopener">Объясни</a></div>
     <form class="ask" id="ask"><input id="ask-in" placeholder="Свой вопрос про этот момент" autocomplete="off" aria-label="Свой вопрос"><button class="btn ghost sm">Спросить</button></form>
-    <div class="ai-off">Сейчас откроется Claude с готовым запросом. Чтобы ответы появлялись прямо здесь, <button class="lnk" id="ai-key">подключите Claude по ключу API</button>.</div>`;
-  else if (sample.viaKey) h += '<div class="ai-key-row"><button class="lnk" id="ai-key">Ключ API</button></div>';
+    <div class="ai-off">Сейчас откроется Claude с готовым запросом. Чтобы ответы появлялись прямо здесь, <button class="lnk" id="ai-key">подключите ИИ по ключу, можно бесплатно</button>.</div>`;
+  else if (sample.viaKey) h += `<div class="ai-key-row"><button class="lnk" id="ai-key">${aiName()} · ключ API</button></div>`;
   if (sample) h += `<div class="ai-btns"><button class="btn primary sm" data-k="viz" ${dis}>Визуализируй это</button><button class="btn ghost sm" data-k="explain" ${dis}>Объясни</button></div>
     <form class="ask" id="ask"><input id="ask-in" placeholder="Свой вопрос про этот момент" autocomplete="off" aria-label="Свой вопрос"><button class="btn ghost sm" ${dis}>Спросить</button></form>
-    ${f.text ? '' : '<div class="ai-off">Расшифровки аудио нет: Claude видит книгу, главу, время и заметку. Если вставить текст фрагмента через «Изменить», ответ будет точнее.</div>'}`;
-  if (busy) h += `<div class="ans"><div class="q">${esc(busy.label)}</div><div class="tx" id="ai-live"><div class="thinking">${busy.kind === 'viz' ? 'Claude рисует, это займёт до минуты…' : 'Claude думает…'}</div></div><div class="foot"><span></span><button id="ai-stop">Остановить</button></div></div>`;
+    ${f.text ? '' : '<div class="ai-off">Расшифровки аудио нет: ИИ видит книгу, главу, время и заметку. Если вставить текст фрагмента через «Изменить», ответ будет точнее.</div>'}`;
+  if (busy) h += `<div class="ans"><div class="q">${esc(busy.label)}</div><div class="tx" id="ai-live"><div class="thinking">${busy.kind === 'viz' ? `${aiName()} рисует, это займёт до минуты…` : `${aiName()} думает…`}</div></div><div class="foot"><span></span><button id="ai-stop">Остановить</button></div></div>`;
   if (a.viz) h += `<div class="ans viz"><div class="q">Визуализация</div><img alt="${esc(a.viz.caption || 'Визуализация фрагмента')}" src="${svgSrc(a.viz.svg)}">${a.viz.caption ? `<div>${esc(a.viz.caption)}</div>` : ''}<div class="foot"><span>${when(a.viz.at)}</span>${sample && !aiBusy ? '<button data-k="viz">Нарисовать заново</button>' : ''}</div></div>`;
   if (a.explain) h += `<div class="ans"><div class="q">Объяснение</div><div class="tx">${md(a.explain.text)}</div><div class="foot"><span>${when(a.explain.at)}</span>${sample && !aiBusy ? '<button data-k="explain">Объяснить заново</button>' : ''}</div></div>`;
   for (const qa of (a.qa || []).slice().reverse())
@@ -1589,7 +1665,7 @@ function askContext(b) {
 }
 function askSheet(b) {
   const w = askWhere(b);
-  openSheet(`<h3>Спросить Claude</h3>
+  openSheet(`<h3>Спросить ${aiName()}</h3>
     <p class="num">Часть ${b.pos.ch + 1} · ${fmt(w.t)}${w.pct != null ? ` · ${w.pct}% книги` : ''} · без спойлеров</p>
     <form class="ask" id="q-form"><input id="q-in" placeholder="Спросите что угодно: кто такой Крауч?" autocomplete="off" enterkeyhint="send" aria-label="Вопрос по книге"><button class="btn primary sm" id="q-go">Спросить</button></form>
     <div id="q-note"></div>
@@ -1608,12 +1684,12 @@ function renderAsks(b) {
   const list = document.getElementById('q-list'); if (!list) return;
   const note = document.getElementById('q-note');
   if (note) {
-    note.innerHTML = !sample ? '<div class="ai-off">Откроется Claude с готовым вопросом. Чтобы ответ появлялся прямо здесь, <button class="lnk" id="q-key">подключите Claude по ключу API</button>.</div>' : '';
+    note.innerHTML = sample?.viaKey ? `<div class="ai-key-row"><button class="lnk" id="q-key">${aiName()} · ключ API</button></div>` : !sample ? '<div class="ai-off">Откроется Claude с готовым вопросом. Чтобы ответ появлялся прямо здесь, <button class="lnk" id="q-key">подключите ИИ по ключу, можно бесплатно</button>.</div>' : '';
     note.querySelector('#q-key')?.addEventListener('click', keySheet);
   }
   const go = document.getElementById('q-go'); if (go) go.disabled = !!askBusy;
   const items = (b.asks || []).slice().reverse();
-  list.innerHTML = items.map(x => `<div class="ans"><div class="q">${esc(x.q)}</div><div class="tx"${x === askBusy?.item ? ' id="q-live"' : ''}>${x.a ? md(x.a) : '<div class="thinking">Claude думает…</div>'}</div><div class="foot"><span class="num">Часть ${x.ch + 1} · ${fmt(x.t)} · ${when(x.at)}</span>${x === askBusy?.item ? '<button id="q-stop">Остановить</button>' : ''}</div></div>`).join('');
+  list.innerHTML = items.map(x => `<div class="ans"><div class="q">${esc(x.q)}</div><div class="tx"${x === askBusy?.item ? ' id="q-live"' : ''}>${x.a ? md(x.a) : `<div class="thinking">${aiName()} думает…</div>`}</div><div class="foot"><span class="num">Часть ${x.ch + 1} · ${fmt(x.t)} · ${when(x.at)}</span>${x === askBusy?.item ? '<button id="q-stop">Остановить</button>' : ''}</div></div>`).join('');
   list.querySelector('#q-stop')?.addEventListener('click', () => askCtl?.abort());
 }
 async function runAsk(b, q) {
