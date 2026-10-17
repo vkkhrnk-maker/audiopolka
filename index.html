@@ -266,6 +266,8 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.25)}
 @keyframes spin{to{transform:rotate(360deg)}}
 .lnk{color:var(--accent);font-weight:600;text-decoration:underline;text-underline-offset:2px;font-size:inherit}
 .ai-key-row{display:flex;justify-content:flex-end;font-size:13px}
+.asks{display:grid;gap:10px;margin-top:12px}
+#q-note .ai-off{margin-top:10px}
 .ai-off{font-size:13px;color:var(--fg-2);background:var(--surface);border-radius:var(--r-s);padding:12px 14px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
@@ -311,6 +313,7 @@ const I = {
   timer:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2M9 2h6"/></svg>',
   list:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>',
   book:'<svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1v-6h3zM3 19a2 2 0 0 0 2 2h1v-6H3z"/></svg>',
+  chat:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>',
   mark:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7V4h3M20 7V4h-3M4 17v3h3M20 17v3h-3M9 12h6"/></svg>',
   plus:'<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
 };
@@ -799,7 +802,7 @@ function openPlayer(b) {
           <button class="ibtn skip" id="p-f30" aria-label="Вперёд на 30 секунд">${I.fwd}<small>30</small></button>
           <button class="ibtn" id="p-next" aria-label="Следующая глава">${I.next}</button>
         </div>
-        <div class="chips"><button class="chip" id="p-speed"></button><button class="chip" id="p-sleep">${I.timer}<span></span></button><button class="chip" id="p-mark">${I.mark}<span>Отметить фрагмент</span></button></div>
+        <div class="chips"><button class="chip" id="p-speed"></button><button class="chip" id="p-sleep">${I.timer}<span></span></button><button class="chip" id="p-mark">${I.mark}<span>Отметить фрагмент</span></button><button class="chip" id="p-ask">${I.chat}<span>Спросить Claude</span></button></div>
         <div class="left-book num" id="p-left"></div>
       </div>
       <div class="chapters">
@@ -831,6 +834,7 @@ function openPlayer(b) {
   $('#p-sleep').onclick = sleepSheet;
   $('#p-more').onclick = () => moreSheet(b);
   $('#p-mark').onclick = markClick;
+  $('#p-ask').onclick = () => askSheet(b);
   $('#t-ch').onclick = () => { tab = 'ch'; renderTabs(); };
   $('#t-fr').onclick = () => { tab = 'fr'; renderTabs(); };
   renderList(); renderTabs(); renderMini(); updatePlayer(true);
@@ -1358,6 +1362,75 @@ async function runAI(b, f, kind, q) {
     aiBusy = null; aiCtl = null;
     if (aiView?.f === f) renderAI(b, f);
     if (viewing === b && tab === 'fr') renderFrags();
+  }
+}
+
+/* ---------- быстрый вопрос по книге: где я сейчас, без спойлеров ---------- */
+const ASK_RULES = `Ты помогаешь человеку, который слушает аудиокнигу и что-то забыл или не понял. Отвечай по-русски, коротко и по делу, 1–4 абзаца. Ключевые имена можно выделять **так**.
+Опирайся только на то, что произошло в книге до места, где сейчас слушатель. Ничего не раскрывай из того, что будет дальше, даже намёками. Если честный ответ требует спойлера, скажи, что это выяснится позже.
+Если не уверен, что именно уже произошло к этому месту, скажи об этом одной фразой и не выдумывай.`;
+let askBusy = null, askCtl = null;
+function askWhere(b) {
+  const t = cur?.id === b.id && audio.src ? audio.currentTime : (b.pos.t || 0);
+  const ch = b.chapters[b.pos.ch], all = total(b);
+  const done = b.chapters.slice(0, b.pos.ch).reduce((s, c) => s + (c.duration || 0), 0) + t;
+  return { t, ch, all, pct: all ? Math.round(done / all * 100) : null };
+}
+function askContext(b) {
+  const w = askWhere(b);
+  return `Книга: «${b.title}»${b.author ? `, ${b.author}` : ''}.
+Где сейчас слушатель: часть ${b.pos.ch + 1} из ${b.chapters.length}${w.ch?.name ? ` («${w.ch.name}»)` : ''}, ${fmt(w.t)} от её начала${w.pct != null ? `; это примерно ${w.pct}% всей аудиокниги длиной ${human(w.all)}. По этому проценту прикинь, какая это глава оригинальной книги и что уже успело произойти.` : '.'}`;
+}
+function askSheet(b) {
+  const w = askWhere(b);
+  openSheet(`<h3>Спросить Claude</h3>
+    <p class="num">Часть ${b.pos.ch + 1} · ${fmt(w.t)}${w.pct != null ? ` · ${w.pct}% книги` : ''} · без спойлеров</p>
+    <form class="ask" id="q-form"><input id="q-in" placeholder="Например: кто такой Крауч?" autocomplete="off" enterkeyhint="send" aria-label="Вопрос по книге"><button class="btn primary sm" id="q-go">Спросить</button></form>
+    <div id="q-note"></div>
+    <div class="asks" id="q-list"></div>`, el => {
+    el.querySelector('#q-form').onsubmit = e => {
+      e.preventDefault();
+      const inp = el.querySelector('#q-in'), q = inp.value.trim();
+      if (!q || askBusy) return;
+      inp.value = '';
+      runAsk(b, q);
+    };
+    renderAsks(b);
+  });
+}
+function renderAsks(b) {
+  const list = document.getElementById('q-list'); if (!list) return;
+  const note = document.getElementById('q-note');
+  if (note) {
+    note.innerHTML = !sample ? '<div class="ai-off">Откроется Claude с готовым вопросом. Чтобы ответ появлялся прямо здесь, <button class="lnk" id="q-key">подключите Claude по ключу API</button>.</div>' : '';
+    note.querySelector('#q-key')?.addEventListener('click', keySheet);
+  }
+  const go = document.getElementById('q-go'); if (go) go.disabled = !!askBusy;
+  const items = (b.asks || []).slice().reverse();
+  list.innerHTML = items.map(x => `<div class="ans"><div class="q">${esc(x.q)}</div><div class="tx"${x === askBusy?.item ? ' id="q-live"' : ''}>${x.a ? md(x.a) : '<div class="thinking">Claude думает…</div>'}</div><div class="foot"><span class="num">Часть ${x.ch + 1} · ${fmt(x.t)} · ${when(x.at)}</span>${x === askBusy?.item ? '<button id="q-stop">Остановить</button>' : ''}</div></div>`).join('');
+  list.querySelector('#q-stop')?.addEventListener('click', () => askCtl?.abort());
+}
+async function runAsk(b, q) {
+  const input = ASK_RULES + '\n\n' + askContext(b) + '\n\nВопрос слушателя: ' + q;
+  if (!sample) { openLink('https://claude.ai/new?q=' + encodeURIComponent(input)); return; }
+  const w = askWhere(b);
+  const item = { q, a: '', at: Date.now(), ch: b.pos.ch, t: w.t };
+  (b.asks = b.asks || []).push(item);
+  askBusy = { item }; const ctl = askCtl = new AbortController();
+  renderAsks(b);
+  try {
+    const { text } = await sample(input, { signal: ctl.signal, cache: false, onText: ({ text }) => {
+      item.a = text;
+      const live = document.getElementById('q-live'); if (live) live.innerHTML = md(text);
+    } });
+    item.a = text;
+  } catch (e) {
+    if (e?.code === 'not_granted' || e?.code === 'sampling_disabled') sample = null;
+    if (!item.a) b.asks.splice(b.asks.indexOf(item), 1);
+    if (e?.code !== 'cancelled') toast(aiError(e?.code), 4000);
+  } finally {
+    askBusy = null; askCtl = null;
+    putBook(b); renderAsks(b);
   }
 }
 
