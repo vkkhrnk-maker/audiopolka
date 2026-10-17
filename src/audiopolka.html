@@ -109,7 +109,7 @@ body.has-mini main{padding-bottom:calc(112px + env(safe-area-inset-bottom,0px))}
 .player .bar-top .lbl{flex:1;text-align:center;font-size:13px;font-weight:600;color:var(--fg-2);letter-spacing:.04em;text-transform:uppercase}
 .pl-body{display:grid;grid-template-columns:minmax(0,440px) minmax(0,1fr);gap:48px;padding-block:8px 40px;align-items:start}
 .pl-main{display:grid;gap:20px}
-.pl-main .cov{border-radius:var(--r-l);box-shadow:var(--shadow);max-width:400px;width:100%;margin:0 auto}
+.pl-main .cov{border-radius:var(--r-l);box-shadow:var(--shadow);max-width:min(400px,38vh);width:100%;margin:0 auto}
 .pl-main .cov .ph span{font-size:30px}
 .pl-title h1{margin:0;font-size:24px;line-height:1.2;letter-spacing:-.01em;text-wrap:balance}
 .pl-title p{margin:4px 0 0;color:var(--fg-2)}
@@ -186,7 +186,7 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.25)}
 
 @media (max-width:820px){
   .pl-body{grid-template-columns:minmax(0,1fr);gap:32px}
-  .pl-main .cov{max-width:320px}
+  .pl-main .cov{max-width:min(320px,38vh)}
   .pl-title{text-align:center}.pl-title .ch{justify-content:center}
 }
 @media (max-width:520px){
@@ -195,7 +195,59 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.25)}
   .ctrls{gap:4px}
   .ctrls .ibtn{width:48px;height:48px}
 }
-@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+/* tabs + fragments */
+.tabs{display:flex;gap:4px;background:var(--surface);border-radius:999px;padding:4px;margin-bottom:12px;width:max-content;max-width:100%}
+.tabs button{height:36px;padding:0 16px;border-radius:999px;font-weight:600;font-size:14px;color:var(--fg-2);display:flex;gap:6px;align-items:center}
+.tabs button[aria-selected="true"]{background:var(--bg);color:var(--fg);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.tabs span{font-weight:500;color:var(--fg-3);font-size:12px}
+.pane-meta{font-size:13px;color:var(--fg-2);margin:0 0 10px 4px}
+.chip.rec{background:var(--danger);color:#fff}
+.chip.rec svg{display:none}
+.chip.rec::before{content:"";width:8px;height:8px;border-radius:50%;background:#fff;animation:blink 1s infinite}
+@keyframes blink{50%{opacity:.3}}
+.fr-acts{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px}
+.fr-hint{font-size:12px;color:var(--fg-2);margin:0 0 14px 4px;max-width:60ch}
+.frlist{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.frag{display:flex;gap:8px;align-items:flex-start;background:var(--surface);border-radius:var(--r-m);padding:10px}
+.frag .ibtn{background:var(--bg);width:40px;height:40px}
+.frag .ibtn svg{width:18px;height:18px}
+.frag .fbody{flex:1;min-width:0;text-align:left;display:grid;gap:2px;padding:2px 4px}
+.frag .ft{font-size:12px;color:var(--accent);font-weight:600}
+.frag b{font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.frag small{color:var(--fg-2);font-size:13px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.fbadges{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}
+.fbadges i{font-style:normal;font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;background:var(--accent-soft);color:var(--accent)}
+.fr-empty{background:var(--surface);border-radius:var(--r-l);padding:24px;color:var(--fg-2);font-size:14px;display:grid;gap:8px;max-width:60ch}
+.fr-empty b{color:var(--fg);font-size:16px}
+.sheet{max-height:92vh;overflow-y:auto;overscroll-behavior:contain}
+.sheet.wide{max-width:680px}
+.field textarea{min-height:96px;border-radius:var(--r-s);border:1px solid var(--line);background:var(--surface);color:var(--fg);padding:12px 14px;font:inherit;resize:vertical}
+.stepper{display:flex;align-items:center;gap:8px}
+.stepper .v{flex:1;min-width:0;height:44px;border-radius:var(--r-s);background:var(--surface);display:flex;align-items:center;padding:0 14px;font-weight:600}
+.stepper button{height:44px;padding:0 12px;border-radius:var(--r-s);background:var(--surface);font-weight:600;font-size:13px;white-space:nowrap}
+.stepper button:hover{background:var(--surface-2)}
+.fd-meta{font-size:13px;color:var(--accent);font-weight:600;margin-bottom:4px}
+.quote{margin:12px 0 0;padding:12px 14px;border-left:3px solid var(--accent);background:var(--surface);border-radius:0 var(--r-s) var(--r-s) 0;font-size:14px;white-space:pre-wrap;max-height:220px;overflow-y:auto}
+.row-acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.btn.sm{height:36px;padding:0 14px;font-size:13px}
+.btn.dz{color:var(--danger)}
+.btn:disabled{opacity:.5;cursor:default}
+.ai{margin-top:20px;border-top:1px solid var(--line);padding-top:16px;display:grid;gap:10px}
+.ai-h{font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--fg-2)}
+.ai-btns{display:flex;gap:8px;flex-wrap:wrap}
+.ask{display:flex;gap:8px}
+.ask input{flex:1;min-width:0;height:40px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--fg);padding:0 16px;font:inherit}
+.ans{background:var(--surface);border-radius:var(--r-m);padding:14px 16px;display:grid;gap:8px;font-size:14px;min-width:0}
+.ans .q{font-weight:600}
+.ans .tx p{margin:0 0 8px}.ans .tx p:last-child{margin:0}
+.ans .foot{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:12px;color:var(--fg-2)}
+.ans .foot button{font-size:12px;font-weight:600;color:var(--accent)}
+.viz img{width:100%;height:auto;border-radius:var(--r-s);display:block}
+.thinking{display:flex;align-items:center;gap:10px;color:var(--fg-2)}
+.thinking::before{content:"";width:14px;height:14px;border-radius:50%;border:2px solid var(--accent);border-top-color:transparent;animation:spin .8s linear infinite;flex:none}
+@keyframes spin{to{transform:rotate(360deg)}}
+.ai-off{font-size:13px;color:var(--fg-2);background:var(--surface);border-radius:var(--r-s);padding:12px 14px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
 
 <header class="top"><div class="wrap">
@@ -216,6 +268,7 @@ input[type=range]:active::-webkit-slider-thumb{transform:scale(1.25)}
 <div class="toast" id="toast" role="status"></div>
 <input type="file" id="f-files" accept="audio/*,.mp3,.m4a,.m4b,.aac,.ogg,.opus,.flac,.wav" multiple hidden>
 <input type="file" id="f-dir" webkitdirectory multiple hidden>
+<input type="file" id="f-cover" accept="image/*" hidden>
 <audio id="audio" preload="metadata"></audio>
 
 <script>
@@ -237,6 +290,7 @@ const I = {
   timer:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2M9 2h6"/></svg>',
   list:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>',
   book:'<svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1v-6h3zM3 19a2 2 0 0 0 2 2h1v-6H3z"/></svg>',
+  mark:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7V4h3M20 7V4h-3M4 17v3h3M20 17v3h-3M9 12h6"/></svg>',
   plus:'<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
 };
 
@@ -438,6 +492,8 @@ async function importGroups(groups) {
   if (added) { toast(added > 1 ? `Добавлено книг: ${added}` : 'Книга добавлена'); render(); }
 }
 async function addBook(files, folderName) {
+  const imgs = files.filter(f => /\.(jpe?g|png|webp)$/i.test(f.name));
+  const folderCover = imgs.find(f => /cover|folder|front|обложк/i.test(f.name)) || imgs[0] || null;
   files = files.filter(f => (f.type||'').startsWith('audio/') || AUDIO_RE.test(f.name));
   if (!files.length) { toast('Здесь нет аудиофайлов. Подойдут MP3, M4A, M4B, OGG, FLAC'); return false; }
   files.sort((a,b) => nat(a.webkitRelativePath||a._path||a.name, b.webkitRelativePath||b._path||b.name));
@@ -446,7 +502,7 @@ async function addBook(files, folderName) {
   const chapters = [];
   const names = files.map(f => stripExt(f.name));
   const title = first.TALB || folderName || commonPrefix(names) || (files.length === 1 ? (first.TIT2 || names[0]) : names[0]);
-  const book = { id, title, author: first.TPE1 || first.TPE2 || '', cover: first.APIC || null, chapters,
+  const book = { id, title, author: first.TPE1 || first.TPE2 || '', cover: folderCover ? await squareCover(folderCover) : (first.APIC || null), chapters,
     pos:{ch:0,t:0}, speed:1, added:Date.now(), last:0, finished:false, importing:true };
   const bytesTotal = files.reduce((s,f)=>s+f.size,0);
   let bytesDone = 0;
@@ -607,6 +663,10 @@ audio.addEventListener('timeupdate', () => {
   if (Date.now() - lastSave > 5000) { lastSave = Date.now(); save(); }
   updatePlayer(); updateMiniLine();
   sleepTick();
+  if (rangeEnd) {
+    if (rangeEnd.bookId !== cur.id || rangeEnd.ch !== cur.pos.ch) rangeEnd = null;
+    else if (audio.currentTime >= rangeEnd.t) { rangeEnd = null; audio.pause(); }
+  }
 });
 audio.addEventListener('play', () => { if (cur) { cur.finished = false; } renderMini(); updatePlayer(true); setPS('playing'); });
 audio.addEventListener('pause', () => { save(); renderMini(); updatePlayer(true); setPS('paused'); });
@@ -718,10 +778,14 @@ function openPlayer(b) {
           <button class="ibtn skip" id="p-f30" aria-label="Вперёд на 30 секунд">${I.fwd}<small>30</small></button>
           <button class="ibtn" id="p-next" aria-label="Следующая глава">${I.next}</button>
         </div>
-        <div class="chips"><button class="chip" id="p-speed"></button><button class="chip" id="p-sleep">${I.timer}<span></span></button></div>
+        <div class="chips"><button class="chip" id="p-speed"></button><button class="chip" id="p-sleep">${I.timer}<span></span></button><button class="chip" id="p-mark">${I.mark}<span>Отметить фрагмент</span></button></div>
         <div class="left-book num" id="p-left"></div>
       </div>
-      <div class="chapters"><h2>Главы <span class="num">${b.chapters.length} · ${human(total(b))}</span></h2><ol class="chlist" id="p-list"></ol></div>
+      <div class="chapters">
+        <div class="tabs" role="tablist"><button id="t-ch" role="tab">Главы <span class="num">${b.chapters.length}</span></button><button id="t-fr" role="tab">Фрагменты <span class="num"></span></button></div>
+        <div id="pane-ch" role="tabpanel"><div class="pane-meta num">${b.chapters.length} ${plural(b.chapters.length,'глава','главы','глав')} · ${human(total(b))}</div><ol class="chlist" id="p-list"></ol></div>
+        <div id="pane-fr" role="tabpanel" hidden></div>
+      </div>
     </div></div>`;
   P.classList.add('open'); document.body.style.overflow = 'hidden';
   $('#p-close').onclick = closePlayer;
@@ -738,14 +802,17 @@ function openPlayer(b) {
     seeking = true;
   };
   seek.onchange = () => {
-    seeking = false;
+    seeking = false; rangeEnd = null;
     if (cur?.id !== b.id) { b.pos.t = seek.value/1000 * (b.chapters[b.pos.ch].duration||0); load(b, true); return; }
     audio.currentTime = seek.value/1000 * (audio.duration||0);
   };
   $('#p-speed').onclick = () => speedSheet(b);
   $('#p-sleep').onclick = sleepSheet;
   $('#p-more').onclick = () => moreSheet(b);
-  renderList(); renderMini(); updatePlayer(true);
+  $('#p-mark').onclick = markClick;
+  $('#t-ch').onclick = () => { tab = 'ch'; renderTabs(); };
+  $('#t-fr').onclick = () => { tab = 'fr'; renderTabs(); };
+  renderList(); renderTabs(); renderMini(); updatePlayer(true);
   history.pushState?.({p:1}, '');
 }
 function closePlayer() {
@@ -776,6 +843,12 @@ function updatePlayer(full) {
     $('#p-el').textContent = fmt(t);
   }
   $('#p-rem').textContent = '-' + fmt((d||0) - t);
+  const mk = $('#p-mark');
+  if (mk) {
+    const on = marking && marking.bookId === b.id;
+    mk.classList.toggle('rec', !!on);
+    mk.querySelector('span').textContent = on ? `Конец фрагмента · ${fmt(Math.max(0, (active ? audio.currentTime : 0) - marking.start))}` : 'Отметить фрагмент';
+  }
   if (full || lastCh !== b.pos.ch) {
     lastCh = b.pos.ch;
     $('#p-ch').innerHTML = `<span class="num">Глава ${b.pos.ch+1} из ${b.chapters.length}</span><em>${esc(ch.name)}</em>`;
@@ -793,12 +866,44 @@ function updatePlayer(full) {
 }
 
 /* ---------- sheets ---------- */
-function openSheet(html, bind) {
+// свайп вниз закрывает нижнее окно и плеер
+function swipeDown(el, close, scroller = el) {
+  let y0 = null, dy = 0, t0 = 0, active = false;
+  el.addEventListener('touchstart', e => {
+    y0 = null;
+    if (e.touches.length !== 1 || e.target.closest('input, textarea, select')) return;
+    if (scroller.scrollTop > 0) return;
+    y0 = e.touches[0].clientY; dy = 0; t0 = Date.now(); active = false;
+  }, {passive: true});
+  el.addEventListener('touchmove', e => {
+    if (y0 == null) return;
+    dy = e.touches[0].clientY - y0;
+    if (!active) {
+      if (dy > 8) { active = true; el.style.transition = 'none'; }
+      else { if (dy < -4) y0 = null; return; }
+    }
+    if (e.cancelable) e.preventDefault();
+    el.style.transform = `translateY(${Math.max(0, dy)}px)`;
+  }, {passive: false});
+  const end = () => {
+    if (y0 == null) return;
+    y0 = null;
+    if (!active) return;
+    el.style.transition = '';
+    const fast = dy / Math.max(1, Date.now() - t0) > 0.6;
+    el.style.transform = '';
+    if (dy > 100 || (fast && dy > 30)) close();
+  };
+  el.addEventListener('touchend', end);
+  el.addEventListener('touchcancel', end);
+}
+function openSheet(html, bind, wide) {
   closeSheet(true);
   const w = document.createElement('div'); w.className = 'sheet-wrap'; w.id = 'sheet';
-  w.innerHTML = `<div class="sheet" role="dialog" aria-modal="true"><div class="grab"></div>${html}</div>`;
+  w.innerHTML = `<div class="sheet${wide ? ' wide' : ''}" role="dialog" aria-modal="true"><div class="grab"></div>${html}</div>`;
   w.onclick = e => { if (e.target === w) closeSheet(); };
   document.body.appendChild(w);
+  swipeDown(w.querySelector('.sheet'), () => closeSheet());
   requestAnimationFrame(() => w.classList.add('show'));
   bind?.(w);
   w.querySelector('button, input')?.focus({preventScroll:true});
@@ -825,12 +930,46 @@ function sleepSheet() {
     });
   });
 }
+/* ---------- cover ---------- */
+// фото с телефона бывают огромными: обрезаем по центру в квадрат и ужимаем до 1000 px
+async function squareCover(file) {
+  try {
+    const bmp = await createImageBitmap(file);
+    const side = Math.min(bmp.width, bmp.height), out = Math.min(1000, side);
+    const c = document.createElement('canvas'); c.width = c.height = out;
+    c.getContext('2d').drawImage(bmp, (bmp.width-side)/2, (bmp.height-side)/2, side, side, 0, 0, out, out);
+    bmp.close?.();
+    return await new Promise(r => c.toBlob(b => r(b || file), 'image/jpeg', 0.88));
+  } catch { return file; }
+}
+function setCover(b, blob) {
+  b.cover = blob;
+  if (coverUrls.has(b.id)) { URL.revokeObjectURL(coverUrls.get(b.id)); coverUrls.delete(b.id); }
+  putBook(b);
+  const pc = $('#p-cov'); if (pc && viewing?.id === b.id) pc.innerHTML = coverHTML(b);
+  render(); renderMini(); if (cur?.id === b.id) mediaMeta();
+}
+function pickCover(b) {
+  const inp = $('#f-cover');
+  inp.onchange = async () => {
+    const f = inp.files[0]; inp.value = '';
+    if (!f) return;
+    if (!(f.type||'').startsWith('image/')) { toast('Это не картинка. Выберите фото или изображение'); return; }
+    setCover(b, await squareCover(f)); toast('Обложка обновлена');
+  };
+  inp.click();
+}
 function moreSheet(b) {
   openSheet(`<h3>${esc(b.title)}</h3><div class="opts">
     <button class="opt" data-a="edit">Изменить название и автора</button>
+    <button class="opt" data-a="cover">${b.cover ? 'Сменить обложку' : 'Поставить обложку'}</button>
+    ${b.cover ? '<button class="opt" data-a="nocover">Убрать обложку</button>' : ''}
     <button class="opt" data-a="restart">Начать сначала</button>
     <button class="opt dz" data-a="del">Удалить с полки</button></div>`, el => {
     el.querySelector('[data-a=edit]').onclick = () => editSheet(b);
+    el.querySelector('[data-a=cover]').onclick = () => { closeSheet(); pickCover(b); };
+    const nc = el.querySelector('[data-a=nocover]');
+    if (nc) nc.onclick = () => { closeSheet(); setCover(b, null); toast('Обложка убрана'); };
     el.querySelector('[data-a=restart]').onclick = () => { closeSheet(); b.finished=false; b.pos={ch:0,t:0}; if (cur?.id===b.id) loadChapter(0,0,!audio.paused); else { putBook(b); updatePlayer(true); } };
     el.querySelector('[data-a=del]').onclick = () => openSheet(`<h3>Удалить «${esc(b.title)}»?</h3><p>Файлы книги и прогресс сотрутся из браузера. Исходные файлы на диске останутся.</p>
       <div class="acts"><button class="btn ghost" data-a="no">Отмена</button><button class="btn danger" data-a="yes">Удалить</button></div>`, el2 => {
@@ -863,6 +1002,264 @@ function editSheet(b) {
   });
 }
 
+/* ---------- fragments ---------- */
+let marking = null;   // {bookId, ch, start} while the first tap is waiting for the second
+let rangeEnd = null;  // {bookId, ch, t}: pause here when a fragment is replayed
+let tab = 'ch';
+let sample = null;
+try { window.claude?.use?.('sample').then(s => { sample = s; refreshAI(); }).catch(() => {}); } catch {}
+
+function markClick() {
+  const b = viewing;
+  if (!b || cur?.id !== b.id || !audio.src) { toast('Сначала включите эту книгу'); return; }
+  if (!marking || marking.bookId !== b.id) {
+    marking = { bookId: b.id, ch: b.pos.ch, start: audio.currentTime };
+    toast('Начало отмечено. Нажмите ещё раз в конце фрагмента');
+    updatePlayer(true); return;
+  }
+  const m = marking; marking = null;
+  const chDur = b.chapters[m.ch].duration || audio.duration || 0;
+  let end = b.pos.ch === m.ch ? audio.currentTime : chDur;
+  if (end - m.start < 3) end = Math.min(chDur || m.start + 15, m.start + 15);
+  updatePlayer(true);
+  fragmentEditSheet(b, { id: 'f' + Date.now().toString(36), ch: m.ch, start: m.start, end, note: '', text: '', created: Date.now(), answers: {} }, true);
+}
+
+function fragmentEditSheet(b, f, isNew) {
+  const d = { start: f.start, end: f.end };
+  const max = b.chapters[f.ch].duration || Math.max(d.end, 1);
+  openSheet(`<h3>${isNew ? 'Новый фрагмент' : 'Фрагмент'}</h3>
+    <p>Глава ${f.ch + 1}: ${esc(b.chapters[f.ch].name)}</p>
+    <div class="field"><label>Начало</label><div class="stepper"><button data-s="start" data-d="-10">−10 с</button><span class="v num" id="fs-start"></span><button data-s="start" data-d="10">+10 с</button></div></div>
+    <div class="field"><label>Конец</label><div class="stepper"><button data-s="end" data-d="-10">−10 с</button><span class="v num" id="fs-end"></span><button data-s="end" data-d="10">+10 с</button></div></div>
+    <div class="field"><label for="fs-note">Заметка</label><input id="fs-note" value="${esc(f.note)}" placeholder="Например: Гарри впервые видит дракона"></div>
+    <div class="field"><label for="fs-text">Текст фрагмента, если есть под рукой</label><textarea id="fs-text" placeholder="Можно вставить кусок из электронной книги. С текстом Claude ответит точнее">${esc(f.text)}</textarea></div>
+    <div class="acts"><button class="btn ghost" data-a="no">Отмена</button><button class="btn primary" data-a="ok">Сохранить</button></div>`, el => {
+    const show = () => {
+      el.querySelector('#fs-start').textContent = fmt(d.start);
+      el.querySelector('#fs-end').textContent = `${fmt(d.end)} · ${Math.round(d.end - d.start)} сек`;
+    };
+    show();
+    el.querySelectorAll('[data-s]').forEach(x => x.onclick = () => {
+      const k = x.dataset.s;
+      d[k] = Math.max(0, Math.min(max, d[k] + Number(x.dataset.d)));
+      if (d.end - d.start < 3) { if (k === 'start') d.start = Math.max(0, d.end - 3); else d.end = Math.min(max, d.start + 3); }
+      show();
+    });
+    el.querySelector('[data-a=no]').onclick = () => closeSheet();
+    el.querySelector('[data-a=ok]').onclick = async () => {
+      Object.assign(f, { start: d.start, end: d.end, note: el.querySelector('#fs-note').value.trim(), text: el.querySelector('#fs-text').value.trim() });
+      b.fragments = b.fragments || [];
+      if (isNew) b.fragments.push(f);
+      await putBook(b);
+      if (isNew) { closeSheet(); toast('Фрагмент сохранён'); } else fragmentSheet(b, f);
+      tab = 'fr'; renderTabs();
+    };
+  });
+}
+
+function renderTabs() {
+  const b = viewing; if (!b || !$('#t-ch')) return;
+  const n = (b.fragments || []).length;
+  $('#t-fr span').textContent = n || '';
+  $('#t-ch').setAttribute('aria-selected', tab === 'ch');
+  $('#t-fr').setAttribute('aria-selected', tab === 'fr');
+  $('#pane-ch').hidden = tab !== 'ch';
+  $('#pane-fr').hidden = tab !== 'fr';
+  if (tab === 'fr') renderFrags();
+}
+const fragTitle = (b, f) => f.note || b.chapters[f.ch]?.name || 'Фрагмент';
+function badges(f) {
+  const a = f.answers || {}, out = [];
+  if (a.viz) out.push('Картинка');
+  if (a.explain) out.push('Объяснение');
+  if (a.qa?.length) out.push(`Вопросы: ${a.qa.length}`);
+  return out.length ? `<span class="fbadges">${out.map(x => `<i>${x}</i>`).join('')}</span>` : '';
+}
+function renderFrags() {
+  const b = viewing, p = $('#pane-fr');
+  const list = [...(b.fragments || [])].sort((x, y) => x.ch - y.ch || x.start - y.start);
+  const on = marking && marking.bookId === b.id;
+  const acts = `<div class="fr-acts"><button class="btn primary sm" id="fr-viz">Визуализировать этот момент</button><button class="btn ghost sm" id="fr-mark">${on ? 'Поставить конец фрагмента' : 'Отметить фрагмент'}</button></div>
+    <p class="fr-hint">«Этот момент» — последняя минута, которую вы прослушали. Чтобы выбрать точнее, нажмите «Отметить фрагмент» в начале и ещё раз в конце.</p>`;
+  const bindActs = () => { $('#fr-viz').onclick = quickMoment; $('#fr-mark').onclick = () => { markClick(); renderFrags(); }; };
+  if (!list.length) {
+    p.innerHTML = `${acts}<div class="fr-empty"><b>Фрагментов пока нет</b>Отмеченные места появятся здесь. Их можно переслушать, а Claude может их визуализировать, объяснить или ответить на вопрос.</div>`;
+    bindActs();
+    return;
+  }
+  p.innerHTML = `${acts}<ol class="frlist">${list.map(f => `<li class="frag">
+    <button class="ibtn" data-play="${f.id}" aria-label="Прослушать фрагмент">${I.play}</button>
+    <button class="fbody" data-open="${f.id}"><span class="ft num">Глава ${f.ch + 1} · ${fmt(f.start)}–${fmt(f.end)}</span><b>${esc(fragTitle(b, f))}</b>${f.text ? `<small>${esc(f.text)}</small>` : ''}${badges(f)}</button>
+  </li>`).join('')}</ol>`;
+  bindActs();
+  const find = id => b.fragments.find(f => f.id === id);
+  p.querySelectorAll('[data-play]').forEach(x => x.onclick = () => playRange(b, find(x.dataset.play)));
+  p.querySelectorAll('[data-open]').forEach(x => x.onclick = () => fragmentSheet(b, find(x.dataset.open)));
+}
+
+// one tap: the last minute listened becomes a fragment and goes straight to Claude
+async function quickMoment() {
+  const b = viewing;
+  if (!b || cur?.id !== b.id || !audio.src) { toast('Сначала включите эту книгу'); return; }
+  const end = audio.currentTime, start = Math.max(0, end - 60);
+  const f = { id: 'f' + Date.now().toString(36), ch: b.pos.ch, start, end: Math.max(end, start + 3), note: '', text: '', created: Date.now(), answers: {} };
+  (b.fragments = b.fragments || []).push(f);
+  await putBook(b);
+  tab = 'fr'; renderTabs();
+  fragmentSheet(b, f);
+  if (sample) runAI(b, f, 'viz');
+  else openLink(claudeLink(b, f, 'viz'));
+}
+
+async function playRange(b, f) {
+  if (!f) return;
+  if (cur?.id !== b.id) { b.pos = { ch: f.ch, t: f.start }; await load(b, true); }
+  else if (b.pos.ch === f.ch && audio.src) { audio.currentTime = f.start; audio.play().catch(() => {}); }
+  else await loadChapter(f.ch, f.start, true);
+  rangeEnd = { bookId: b.id, ch: f.ch, t: f.end };
+}
+
+function fragmentSheet(b, f) {
+  const ch = b.chapters[f.ch];
+  openSheet(`<div class="fd-meta num">Глава ${f.ch + 1} из ${b.chapters.length} · ${fmt(f.start)}–${fmt(f.end)} · ${Math.round(f.end - f.start)} сек</div>
+    <h3>${esc(fragTitle(b, f))}</h3>
+    ${f.note ? `<p>${esc(ch?.name || '')}</p>` : ''}
+    ${f.text ? `<div class="quote">${esc(f.text)}</div>` : ''}
+    <div class="row-acts">
+      <button class="btn primary sm" data-a="play">Прослушать</button>
+      <button class="btn ghost sm" data-a="edit">Изменить</button>
+      <button class="btn ghost sm dz" data-a="del">Удалить</button>
+    </div>
+    <div class="ai" id="ai"></div>`, el => {
+    el.querySelector('[data-a=play]').onclick = () => { closeSheet(); playRange(b, f); };
+    el.querySelector('[data-a=edit]').onclick = () => fragmentEditSheet(b, f, false);
+    const del = el.querySelector('[data-a=del]');
+    del.onclick = async () => {
+      if (!del.dataset.sure) { del.dataset.sure = '1'; del.textContent = 'Точно удалить?'; return; }
+      if (aiBusy?.fid === f.id) aiCtl?.abort();
+      b.fragments = b.fragments.filter(x => x.id !== f.id);
+      await putBook(b); closeSheet(); renderTabs(); toast('Фрагмент удалён');
+    };
+    renderAI(b, f);
+  }, true);
+}
+
+/* ---------- Claude: visualize, explain, ask ---------- */
+let aiCtl = null, aiBusy = null, aiView = null;
+const RULES = `Ты помогаешь человеку, который слушает аудиокнигу и отметил в ней фрагмент. Пиши по-русски, просто и живо.
+Если текста фрагмента нет, опирайся на заметку слушателя и на то, что знаешь об этой книге. Если не уверен, что именно происходит в этом месте, скажи об этом одной фразой и не выдумывай цитат.
+Не раскрывай, что будет дальше по сюжету после этого места.`;
+function fragContext(b, f) {
+  const ch = b.chapters[f.ch];
+  const pct = ch.duration ? Math.round(f.start / ch.duration * 100) : null;
+  const all = total(b);
+  const bookPct = all ? Math.round((b.chapters.slice(0, f.ch).reduce((s, c) => s + (c.duration || 0), 0) + f.start) / all * 100) : null;
+  return `Книга: «${b.title}»${b.author ? `, ${b.author}` : ''}.${bookPct != null ? `\nМесто в книге: примерно ${bookPct}% от начала всей аудиокниги (общая длина ${human(all)}). По этому проценту прикинь, какая это глава оригинальной книги.` : ''}
+Глава ${f.ch + 1} из ${b.chapters.length}${ch?.name ? `, в плеере называется «${ch.name}»` : ''}.
+Фрагмент: с ${fmt(f.start)} по ${fmt(f.end)} от начала главы, около ${Math.round(f.end - f.start)} секунд аудио${pct != null ? `; это примерно ${pct}% от начала главы длиной ${fmt(ch.duration)}` : ''}.
+Заметка слушателя: ${f.note || 'нет'}.
+${f.text ? `Текст фрагмента:\n"""\n${f.text.slice(0, 12000)}\n"""` : 'Текста фрагмента нет, расшифровки аудио нет.'}`;
+}
+const PROMPTS = {
+  explain: `${RULES}\n\nОбъясни этот момент: что происходит, кто участвует, почему это важно и какие детали легко пропустить на слух. 3–6 коротких абзацев без заголовков. Ключевые слова можно выделять **так**.\n\n`,
+  qa: `${RULES}\n\nОтветь на вопрос слушателя об этом моменте. Коротко и по делу, не больше 5 абзацев. Ключевые слова можно выделять **так**.\n\n`,
+  viz: `${RULES}\n\nНарисуй визуализацию этого момента книги в SVG. Выбери форму, которая лучше всего помогает понять момент: иллюстрация сцены, схема места действия, карта связей персонажей или шкала событий.
+Требования к SVG: корневой тег <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500">; первый элемент — прямоугольник фона на весь viewBox; у каждой фигуры явный fill; спокойная гармоничная палитра; подписи по-русски, font-family="sans-serif", размер шрифта не меньше 16, подписи не налезают друг на друга и не выходят за край; без <script>, <foreignObject>, <image>, ссылок и внешних шрифтов.
+Ответь только JSON-объектом: {"caption": "одно предложение о том, что изображено", "svg": "<svg ...>...</svg>"}\n\n`,
+};
+function aiError(code) {
+  return ({
+    not_granted: 'Claude не разрешён для этой страницы. Разрешение можно дать в меню артефакта',
+    sampling_disabled: 'Claude недоступен для этого аккаунта',
+    rate_limited: 'Слишком много запросов. Попробуйте чуть позже',
+    session_expired: 'Нужно заново войти в Claude',
+    refused: 'Claude не стал отвечать на этот запрос. Попробуйте сформулировать иначе',
+    invalid_json: 'Картинка не получилась. Попробуйте ещё раз',
+    bad_svg: 'Картинка не получилась. Попробуйте ещё раз',
+    prompt_too_large: 'Текст фрагмента слишком длинный. Сократите его',
+    empty_completion: 'Claude ничего не ответил. Попробуйте ещё раз',
+  })[code] || 'Не получилось связаться с Claude. Попробуйте ещё раз';
+}
+function md(s) {
+  return String(s || '').trim().split(/\n{2,}/).map(p =>
+    `<p>${esc(p).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br>')}</p>`).join('');
+}
+const when = at => at ? new Date(at).toLocaleDateString('ru', { day: 'numeric', month: 'long' }) : '';
+// rendered through <img>, so nothing inside the SVG can run or load
+const svgSrc = svg => 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+
+// вне Claude (приложение на телефоне) — открываем Claude с уже составленным запросом
+const VIZ_LINK = `${RULES}\n\nВизуализируй этот момент книги: нарисуй то, что лучше всего поможет его понять — иллюстрацию сцены, схему места действия, карту связей персонажей или шкалу событий.\n\n`;
+function claudeLink(b, f, kind, q) {
+  const head = kind === 'viz' ? VIZ_LINK : PROMPTS[kind];
+  const text = head + fragContext(b, f) + (kind === 'qa' ? `\n\nВопрос слушателя: ${q}` : '');
+  return 'https://claude.ai/new?q=' + encodeURIComponent(text);
+}
+function openLink(href) { const a = document.createElement('a'); a.href = href; a.target = '_blank'; a.rel = 'noopener'; document.body.appendChild(a); a.click(); a.remove(); }
+function refreshAI() { if (aiView && document.getElementById('ai')) renderAI(aiView.b, aiView.f); }
+function renderAI(b, f) {
+  aiView = { b, f };
+  const el = document.getElementById('ai'); if (!el) return;
+  const a = f.answers || (f.answers = {});
+  const busy = aiBusy && aiBusy.fid === f.id ? aiBusy : null;
+  const dis = aiBusy ? 'disabled' : '';
+  let h = '<div class="ai-h">Спросить Claude</div>';
+  if (!sample) h += `<div class="ai-btns"><a class="btn primary sm" href="${claudeLink(b, f, 'viz')}" target="_blank" rel="noopener">Визуализируй это</a><a class="btn ghost sm" href="${claudeLink(b, f, 'explain')}" target="_blank" rel="noopener">Объясни</a></div>
+    <form class="ask" id="ask"><input id="ask-in" placeholder="Свой вопрос про этот момент" autocomplete="off" aria-label="Свой вопрос"><button class="btn ghost sm">Спросить</button></form>
+    <div class="ai-off">Откроется Claude с готовым запросом про этот момент.</div>`;
+  else h += `<div class="ai-btns"><button class="btn primary sm" data-k="viz" ${dis}>Визуализируй это</button><button class="btn ghost sm" data-k="explain" ${dis}>Объясни</button></div>
+    <form class="ask" id="ask"><input id="ask-in" placeholder="Свой вопрос про этот момент" autocomplete="off" aria-label="Свой вопрос"><button class="btn ghost sm" ${dis}>Спросить</button></form>
+    ${f.text ? '' : '<div class="ai-off">Расшифровки аудио нет: Claude видит книгу, главу, время и заметку. Если вставить текст фрагмента через «Изменить», ответ будет точнее.</div>'}`;
+  if (busy) h += `<div class="ans"><div class="q">${esc(busy.label)}</div><div class="tx" id="ai-live"><div class="thinking">${busy.kind === 'viz' ? 'Claude рисует, это займёт до минуты…' : 'Claude думает…'}</div></div><div class="foot"><span></span><button id="ai-stop">Остановить</button></div></div>`;
+  if (a.viz) h += `<div class="ans viz"><div class="q">Визуализация</div><img alt="${esc(a.viz.caption || 'Визуализация фрагмента')}" src="${svgSrc(a.viz.svg)}">${a.viz.caption ? `<div>${esc(a.viz.caption)}</div>` : ''}<div class="foot"><span>${when(a.viz.at)}</span>${sample && !aiBusy ? '<button data-k="viz">Нарисовать заново</button>' : ''}</div></div>`;
+  if (a.explain) h += `<div class="ans"><div class="q">Объяснение</div><div class="tx">${md(a.explain.text)}</div><div class="foot"><span>${when(a.explain.at)}</span>${sample && !aiBusy ? '<button data-k="explain">Объяснить заново</button>' : ''}</div></div>`;
+  for (const qa of (a.qa || []).slice().reverse())
+    h += `<div class="ans"><div class="q">${esc(qa.q)}</div><div class="tx">${md(qa.a)}</div><div class="foot"><span>${when(qa.at)}</span></div></div>`;
+  el.innerHTML = h;
+  el.querySelectorAll('[data-k]').forEach(x => x.onclick = () => runAI(b, f, x.dataset.k));
+  const form = el.querySelector('#ask');
+  if (form) form.onsubmit = e => {
+    e.preventDefault();
+    const q = form.querySelector('#ask-in').value.trim();
+    if (!q) return;
+    if (sample) runAI(b, f, 'qa', q);
+    else openLink(claudeLink(b, f, 'qa', q));
+  };
+  const stop = el.querySelector('#ai-stop');
+  if (stop) stop.onclick = () => aiCtl?.abort();
+}
+async function runAI(b, f, kind, q) {
+  if (!sample || aiBusy) return;
+  aiBusy = { fid: f.id, kind, label: kind === 'viz' ? 'Визуализация' : kind === 'explain' ? 'Объяснение' : q };
+  const ctl = aiCtl = new AbortController();
+  renderAI(b, f);
+  const input = PROMPTS[kind] + fragContext(b, f) + (kind === 'qa' ? `\n\nВопрос слушателя: ${q}` : '');
+  try {
+    if (kind === 'viz') {
+      const r = await sample.json(input, { signal: ctl.signal, cache: false });
+      const svg = String(r?.svg || '').trim();
+      if (!/^<svg[\s>]/i.test(svg)) throw { code: 'bad_svg' };
+      f.answers.viz = { svg, caption: String(r.caption || '').slice(0, 300), at: Date.now() };
+    } else {
+      const { text } = await sample(input, { signal: ctl.signal, cache: false, onText: ({ text }) => {
+        const live = document.getElementById('ai-live');
+        if (live && aiView?.f === f) live.innerHTML = md(text);
+      } });
+      if (kind === 'explain') f.answers.explain = { text, at: Date.now() };
+      else (f.answers.qa = f.answers.qa || []).push({ q, a: text, at: Date.now() });
+    }
+    await putBook(b);
+  } catch (e) {
+    if (e?.code === 'not_granted' || e?.code === 'sampling_disabled') sample = null;
+    if (e?.code !== 'cancelled') toast(aiError(e?.code), 4000);
+  } finally {
+    aiBusy = null; aiCtl = null;
+    if (aiView?.f === f) renderAI(b, f);
+    if (viewing === b && tab === 'fr') renderFrags();
+  }
+}
+
 /* ---------- keyboard ---------- */
 addEventListener('keydown', e => {
   if (e.target.closest('input, textarea')) return;
@@ -872,6 +1269,8 @@ addEventListener('keydown', e => {
   else if (e.key === 'ArrowLeft') seekBy(-15);
   else if (e.key === 'ArrowRight') seekBy(30);
 });
+
+swipeDown($('#player'), () => { if (history.state?.p) history.back(); else closePlayer(); });
 
 /* ---------- boot ---------- */
 (async () => {
@@ -885,4 +1284,3 @@ const _toggle = toggle;
 toggle = function () { if (cur && !audio.src) return load(cur, true); _toggle(); };
 })();
 </script>
-
